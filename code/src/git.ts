@@ -159,6 +159,11 @@ export class Git {
     return (await this.maybe(root, ['merge-base', a, b])) || undefined;
   }
 
+  /** Whether `a` is `b` or comes before it in its history. */
+  async isAncestor(root: string, a: string, b: string): Promise<boolean> {
+    return (await this.exec(root, ['merge-base', '--is-ancestor', a, b], false)).ok;
+  }
+
   async isBranch(root: string, name: string): Promise<boolean> {
     if (name.startsWith('-')) return false;
     for (const ref of [`refs/heads/${name}`, `refs/remotes/${name}`]) {

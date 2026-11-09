@@ -129,5 +129,7 @@ describe('Git', () => {
     expect(await git.hasCommit(repo, commits[0]!.sha)).toBe(true);
     expect(await git.hasCommit(repo, 'f'.repeat(40))).toBe(false);
     expect(await git.hasCommit(repo, '--help')).toBe(false);
+    expect(await git.isAncestor(repo, commits[1]!.sha, commits[0]!.sha)).toBe(true);
+    expect(await git.isAncestor(repo, commits[0]!.sha, commits[1]!.sha)).toBe(false);
   });
 });
