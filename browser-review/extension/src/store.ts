@@ -197,7 +197,7 @@ export class Store {
             (c.status === 'review_ready' ? 'It is waiting for the user to review.' : 'It is already accepted.'),
         );
       }
-      await this.#status(c, 'in_progress', 'Claude started working on this.');
+      await this.#status(c, 'in_progress', 'The agent started working on this.');
     });
   }
 
@@ -217,7 +217,7 @@ export class Store {
         createdAt: now(),
       };
       c.solution = solution;
-      await this.#status(c, 'review_ready', 'Claude marked this review ready.');
+      await this.#status(c, 'review_ready', 'The agent marked this review ready.');
     });
   }
 

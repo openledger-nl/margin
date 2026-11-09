@@ -1,5 +1,5 @@
 // The help page (help.html): setup command, live connection status, shortcuts.
-import { MCP_ADD_COMMAND } from '@brm/shared';
+import { MCP_ADD_COMMAND, MCP_ADD_COMMAND_CODEX, MCP_JSON_CONFIG } from '@brm/shared';
 import type { ContentRequest, StatusResponse } from './messages.ts';
 import { HOLD_KEY, HOLD_KEYS, SEND_KEY, SEND_KEYS, toHoldKey, toSendKey } from './settings.ts';
 import { SITE_ACCESS, SITE_ACCESS_KEY, SITES_KEY, toSiteAccess, toSites } from './sites.ts';
@@ -7,6 +7,8 @@ import { SITE_ACCESS, SITE_ACCESS_KEY, SITES_KEY, toSiteAccess, toSites } from '
 const $ = (id: string) => document.getElementById(id)!;
 
 $('cmd').textContent = MCP_ADD_COMMAND;
+$('cmd-codex').textContent = MCP_ADD_COMMAND_CODEX;
+$('cmd-json').textContent = MCP_JSON_CONFIG;
 $('version').textContent = chrome.runtime.getManifest().version;
 
 // ---------- copy buttons ----------
@@ -33,12 +35,12 @@ async function refreshStatus(): Promise<void> {
   const box = $('status');
   box.classList.toggle('is-on', !!s?.claude);
   if (s?.claude) {
-    $('status-title').textContent = 'Claude Code is connected';
-    $('status-text').textContent = `MCP server ${s.mcpVersion ?? ''} is running. Ask Claude to check the review comments.`;
+    $('status-title').textContent = 'A coding agent is connected';
+    $('status-text').textContent = `MCP server ${s.mcpVersion ?? ''} is running. Ask your agent to check the review comments.`;
   } else {
-    $('status-title').textContent = 'Claude Code is not connected';
+    $('status-title').textContent = 'No coding agent is connected';
     $('status-text').textContent =
-      'Do step 1 once, then start a Claude Code session. Your comments are saved in the meantime.';
+      'Do step 1 once, then start a session in your agent. Your comments are saved in the meantime.';
   }
 }
 void refreshStatus();

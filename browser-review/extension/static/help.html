@@ -283,13 +283,13 @@
         <h1>Margin Browser Review</h1>
       </header>
       <p class="lead">
-        Comment on your dev app like in Figma, remove or edit elements, and let Claude Code fix it in the code.
+        Comment on your dev app like in Figma, remove or edit elements, and let your coding agent fix it in the code.
       </p>
 
       <div id="status" class="status" role="status">
         <span class="dot"></span>
         <div>
-          <strong id="status-title">Checking the connection to Claude Code…</strong>
+          <strong id="status-title">Checking the connection to your coding agent…</strong>
           <span id="status-text"></span>
         </div>
       </div>
@@ -304,19 +304,30 @@
       </div>
 
       <section id="setup">
-        <h2><span class="step">1</span>Connect Claude Code (once)</h2>
-        <p>Run this in a terminal. It adds the Margin Browser Review MCP server to Claude Code for all your projects:</p>
+        <h2><span class="step">1</span>Connect your coding agent (once)</h2>
+        <p>Margin Browser Review works with any agent that supports MCP. Run the command for yours in a terminal.</p>
+        <p><strong>Claude Code</strong> (adds it for all your projects):</p>
         <div class="cmd">
           <pre id="cmd"></pre>
           <button class="copy" data-copy="cmd">Copy</button>
         </div>
+        <p><strong>Codex</strong>:</p>
+        <div class="cmd">
+          <pre id="cmd-codex"></pre>
+          <button class="copy" data-copy="cmd-codex">Copy</button>
+        </div>
+        <p><strong>Other agents</strong> (Cursor, Gemini CLI and others that use an <code>mcpServers</code> config): add this to the agent's MCP config file.</p>
+        <div class="cmd">
+          <pre id="cmd-json"></pre>
+          <button class="copy" data-copy="cmd-json">Copy</button>
+        </div>
         <p>
-          That's all. You don't start anything yourself: Claude Code starts the MCP server when a session starts, and
-          this extension connects to it. The dot above turns green when a Claude Code session is running.
+          That's all. You don't start anything yourself: your agent starts the MCP server when a session starts, and
+          this extension connects to it. The dot above turns green while a session is running.
         </p>
         <p class="dim">Needs <a href="https://nodejs.org" target="_blank" rel="noreferrer">Node.js</a> 20 or newer (for <code>npx</code>).</p>
         <div class="tip">
-          <strong>Optional: no permission question for every tool.</strong> Add this to
+          <strong>Claude Code, optional: no permission question for every tool.</strong> Add this to
           <code>~/.claude/settings.json</code>:
           <div class="cmd">
             <pre id="perm">{
@@ -338,8 +349,8 @@
             <strong>Pick element</strong> (or hold down <kbd>Left Alt</kbd>: the picker starts right away and stops when you let go), click what you want changed, and choose:
             <ul>
               <li><strong>Comment</strong>: write what should change.</li>
-              <li><strong>Remove</strong>: the element disappears right away (preview), Claude removes it in the code.</li>
-              <li><strong>Edit</strong>: change its texts or add CSS with a live preview, Claude makes the same change.</li>
+              <li><strong>Remove</strong>: the element disappears right away (preview), your agent removes it in the code.</li>
+              <li><strong>Edit</strong>: change its texts or add CSS with a live preview, your agent makes the same change.</li>
             </ul>
             After sending, the <strong>Threads</strong> count goes up; tick <strong>Open thread</strong> in the box to see the new thread in the sidebar instead (it remembers your choice). Need more room to write? Drag the box's bottom-right corner; it remembers the size. The Threads sidebar is the browser's side panel: drag its edge to make it wider. If the <strong>Threads</strong> button can't open it, use the extension icon or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
           </li>
@@ -347,18 +358,18 @@
         </ol>
         <p>
           Every comment gets a numbered pin, a screenshot, and the element's selectors, HTML and React component, so
-          Claude knows exactly what you mean. What you type survives a reload of your app.
+          your agent knows exactly what you mean. What you type survives a reload of your app.
         </p>
       </section>
 
       <section id="claude">
-        <h2><span class="step">3</span>Let Claude fix it</h2>
-        <p>Open Claude Code in your <strong>app's</strong> project folder and say:</p>
+        <h2><span class="step">3</span>Let your agent fix it</h2>
+        <p>Start your agent in your <strong>app's</strong> project folder and say:</p>
         <div class="cmd">
           <pre id="ask">Check the review comments.</pre>
           <button class="copy" data-copy="ask">Copy</button>
         </div>
-        <p>Claude lists the comments, marks each one <span class="badge st-progress">In progress</span>, fixes it in the code, and marks it <span class="badge st-review">Review ready</span> with a note on how it solved it. You see this live in the sidebar. Pick which statuses to see under <strong>Show</strong> at the top; <strong>Collapse all</strong> gives an overview.</p>
+        <p>The agent lists the comments, marks each one <span class="badge st-progress">In progress</span>, fixes it in the code, and marks it <span class="badge st-review">Review ready</span> with a note on how it solved it. You see this live in the sidebar. Pick which statuses to see under <strong>Show</strong> at the top; <strong>Collapse all</strong> gives an overview.</p>
         <p>More specific: <em>"Fix review comment #12."</em> or <em>"Check the review comments for http://localhost:5173 only."</em></p>
       </section>
 
@@ -370,9 +381,9 @@
             <tr><th>Status</th><th>Set by</th><th>Meaning</th></tr>
           </thead>
           <tbody>
-            <tr><td><span class="badge st-open">Open</span></td><td>you</td><td>waiting for Claude</td></tr>
-            <tr><td><span class="badge st-progress">In progress</span></td><td>Claude</td><td>Claude is working on it</td></tr>
-            <tr><td><span class="badge st-review">Review ready</span></td><td>Claude</td><td>fixed, with a note on how; waiting for you</td></tr>
+            <tr><td><span class="badge st-open">Open</span></td><td>you</td><td>waiting for your agent</td></tr>
+            <tr><td><span class="badge st-progress">In progress</span></td><td>agent</td><td>your agent is working on it</td></tr>
+            <tr><td><span class="badge st-review">Review ready</span></td><td>agent</td><td>fixed, with a note on how; waiting for you</td></tr>
             <tr><td><span class="badge st-accepted">Accepted</span></td><td>you</td><td>done</td></tr>
           </tbody>
         </table>
@@ -430,7 +441,7 @@
         <h3>Security</h3>
         <ul>
           <li>On a site where it runs, the overlay can read the page (to pick elements, take screenshots and find the React component). That is why it only runs where you allow it.</li>
-          <li>Comments, screenshots and settings stay in this browser. They only go to the Claude Code sessions on this computer, over <code>127.0.0.1</code>.</li>
+          <li>Comments, screenshots and settings stay in this browser. They only go to the agent sessions on this computer, over <code>127.0.0.1</code>.</li>
           <li>Turning a site off here stops the overlay from loading there; reload tabs that are open on it. Its comments stay until you delete them.</li>
         </ul>
       </section>
@@ -438,14 +449,14 @@
       <section id="trouble">
         <h2>Troubleshooting</h2>
         <details>
-          <summary>The dot stays grey: Claude Code is not connected</summary>
+          <summary>The dot stays grey: no coding agent is connected</summary>
           <ul>
-            <li>Did you run the command in step 1? Check with <code>claude mcp list</code>: <code>browser-review</code> should be listed and say <strong>Connected</strong>.</li>
-            <li>Claude Code only runs the server while a session is open. Start <code>claude</code>, or in a running session type <code>/mcp</code> and reconnect <code>browser-review</code>.</li>
+            <li>Did you do step 1? Your agent should list <code>browser-review</code> as an MCP server (Claude Code: <code>claude mcp list</code>, Codex: <code>codex mcp list</code>).</li>
+            <li>Your agent only runs the server while a session is open. Start a session, or reconnect <code>browser-review</code> in a running one (Claude Code: <code>/mcp</code>).</li>
             <li>Node.js missing or too old: <code>node --version</code> must be 20 or newer.</li>
             <li>Port 4777 must be free. Another program on that port blocks the connection.</li>
           </ul>
-          <p>Your comments are still saved while the dot is grey. Claude sees them once it connects.</p>
+          <p>Your comments are still saved while the dot is grey. Your agent sees them once it connects.</p>
         </details>
         <details>
           <summary>Nothing happens when I click the icon</summary>
@@ -455,11 +466,11 @@
           </ul>
         </details>
         <details>
-          <summary>Claude can't take a screenshot</summary>
-          <p>Claude's <code>capture_screenshot</code> needs the page open in a tab of this browser. It switches to that tab, scrolls to the element and takes the picture.</p>
+          <summary>The agent can't take a screenshot</summary>
+          <p>The <code>capture_screenshot</code> tool needs the page open in a tab of this browser. It switches to that tab, scrolls to the element and takes the picture.</p>
         </details>
         <details>
-          <summary>Several Claude Code sessions at once</summary>
+          <summary>Several agent sessions at once</summary>
           <p>That works. The first session's server talks to the extension, the others go through it. When the first one closes, another takes over.</p>
         </details>
         <details>

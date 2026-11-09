@@ -228,8 +228,8 @@ export function Sidebar({ comments, path, connected, focusId, docked, onClose, o
       </nav>
       {!connected && (
         <p class="brm-warn">
-          Claude Code is not connected. Your comments are saved here; Claude sees them as soon as a Claude Code session
-          with browser-review runs.{' '}
+          No coding agent is connected. Your comments are saved here; your agent sees them as soon as a session with
+          browser-review runs.{' '}
           <a
             href="#"
             onClick={(e) => {
@@ -347,7 +347,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
               <li key={m.id} class={`brm-msg by-${m.author}`}>
                 {m.author !== 'system' && (
                   <div class="brm-msg-meta">
-                    {m.author === 'user' ? 'You' : 'Claude'} <span class="brm-dim">{time(m.createdAt)}</span>
+                    {m.author === 'user' ? 'You' : 'Agent'} <span class="brm-dim">{time(m.createdAt)}</span>
                   </div>
                 )}
                 <div class="brm-msg-body">{m.body}</div>
@@ -357,7 +357,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
 
           {c.solution && (
             <div class="brm-solution">
-              <div class="brm-solution-title">How Claude solved it</div>
+              <div class="brm-solution-title">How the agent solved it</div>
               <div class="brm-msg-body">{c.solution.note}</div>
               {c.solution.files.length > 0 && (
                 <ul class="brm-files">

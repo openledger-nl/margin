@@ -37,8 +37,8 @@ export function Toolbar(p: Props) {
         class={`brm-dot ${p.connected ? 'is-on' : 'is-off'}`}
         title={
           p.connected
-            ? 'Claude Code is connected'
-            : 'Claude Code is not connected. Your comments are saved; Claude sees them when a session with browser-review runs. Click ? for setup.'
+            ? 'A coding agent is connected'
+            : 'No coding agent is connected. Your comments are saved; your agent sees them when a session with browser-review runs. Click ? for setup.'
         }
       />
       <button class={`brm-tool ${p.picking ? 'is-active' : ''}`} onClick={p.onPick} title="Pick an element to comment on, remove or edit (Alt+Shift+P)">

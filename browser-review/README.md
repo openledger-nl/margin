@@ -1,27 +1,28 @@
 # Margin Browser Review
 
 Review your own dev app in Brave, Chrome or Firefox the way you would
-in Figma, and let Claude Code fix it.
+in Figma, and let your coding agent fix it. Works with Claude Code, Codex and
+any other agent that supports MCP.
 
 - **Comment** on the whole page or on one element. A numbered pin marks it.
 - **Remove** an element (like an adblocker's element picker). It disappears right
   away, stays gone after a reload, and can be undone.
 - **Edit** an element's text and CSS, with a live preview.
-- Every comment, removal and edit becomes a task Claude reads over **MCP**, with
+- Every comment, removal and edit becomes a task your agent reads over **MCP**, with
   selectors, HTML, React component names, the source file and screenshots.
-- Claude marks a task **in progress**, fixes it in the code, and marks it
+- The agent marks a task **in progress**, fixes it in the code, and marks it
   **review ready** with a short note on how it solved it. You **accept** it or
   **reopen** it in the browser.
 
 ```
-Brave extension  <---- WebSocket ---->  browser-review-mcp  <-- MCP (stdio) -->  Claude Code
+Brave extension  <---- WebSocket ---->  browser-review-mcp  <-- MCP (stdio) -->  your agent
 (overlay, sidebar,                      127.0.0.1:4777                           (starts it per session)
  comments in IndexedDB)                 (npx, a bridge)
 ```
 
-You never start a server yourself: Claude Code starts `browser-review-mcp` with
+You never start a server yourself: your agent starts `browser-review-mcp` with
 each session (like Browser MCP), and the extension connects to it. Comments live
-in the extension, so you can review while no Claude session is open.
+in the extension, so you can review while no agent session is open.
 
 Runs by itself on local addresses (`localhost`, `127.0.0.1`) and dev domains
 like `*.test` (Herd, Valet) or `*.ddev.site`; on any other site (a dev server,
@@ -45,7 +46,7 @@ it off on the help page.)
 <img src="docs/screenshots/comment-on-an-element.gif" alt="Picking the Start for free button and writing a comment" width="800">
 
 **Edit text or CSS, with a live preview.** Here the typo "acutally" becomes
-"actually". Claude gets the before and after, and fixes it in the code.
+"actually". The agent gets the before and after, and fixes it in the code.
 
 <img src="docs/screenshots/edit-text-live.gif" alt="Picking the headline and fixing a typo in the Edit tab" width="800">
 
@@ -54,8 +55,8 @@ panel. The page gets narrower instead of being covered.
 
 <img src="docs/screenshots/page-comment-and-side-panel.gif" alt="Writing a page comment, then the side panel opens with the threads" width="800">
 
-**Claude picks them up.** Each thread shows its screenshot, the change, and
-Claude's progress. When Claude is done it marks the thread review ready; you
+**Your agent picks them up.** Each thread shows its screenshot, the change, and
+the agent's progress. When the agent is done it marks the thread review ready; you
 accept it or reopen it.
 
 <img src="docs/screenshots/side-panel-claude-working.png" alt="The side panel next to the page, with three threads Claude is working on" width="800">
@@ -100,29 +101,52 @@ Comments are per browser: Brave and Firefox each keep their own.
 The **help page** opens on install. It's also under right-click on the icon,
 **Options** (Firefox: **Manage Extension**, **Preferences**), and behind the **?**
 in the overlay. It shows the setup command and
-whether Claude Code is connected.
+whether an agent is connected.
 
 Brave asks for access to all sites. Chrome only allows the screenshot API with
 that permission, and it lets the overlay run on the sites you turn on. The
 overlay only runs where you allow it: see [Where it works](#where-it-works).
 
-### 2. Connect Claude Code (once)
+### 2. Connect your coding agent (once)
 
-Run this in a terminal (not inside Claude Code):
+Browser Review is a plain MCP server over stdio, so any agent that supports MCP
+can use it. It needs Node.js 20 or newer for `npx`.
+
+**Claude Code.** Run this in a terminal (not inside Claude Code):
 
 ```sh
 claude mcp add --scope user browser-review -- npx -y browser-review-mcp@latest
 ```
 
-- `--scope user`: available in every project.
-- `browser-review` is the name. The tools show up as
-  `mcp__browser-review__list_comments` and so on.
-- Needs Node.js 20 or newer for `npx`.
+`--scope user` makes it available in every project. Check with
+`claude mcp list`: `browser-review` should say **Connected**.
 
-Check with `claude mcp list`: `browser-review` should say **Connected**. Start a
-Claude Code session and the dot in the overlay (and on the help page) turns green.
+**Codex.**
 
-Optional, no permission prompt for every tool: add this to
+```sh
+codex mcp add browser-review -- npx -y browser-review-mcp@latest
+```
+
+Check with `codex mcp list`.
+
+**Other agents** (Cursor, Gemini CLI and others that use an `mcpServers`
+config): add this to the agent's MCP config file.
+
+```json
+{
+  "mcpServers": {
+    "browser-review": {
+      "command": "npx",
+      "args": ["-y", "browser-review-mcp@latest"]
+    }
+  }
+}
+```
+
+Start a session in your agent and the dot in the overlay (and on the help page)
+turns green.
+
+Optional for Claude Code, no permission prompt for every tool: add this to
 `~/.claude/settings.json`:
 
 ```json
@@ -141,11 +165,11 @@ To remove it: `claude mcp remove --scope user browser-review`.
    extension icon. The review sidebar opens in the browser's side panel, next to
    the page: the page gets narrower, like with DevTools docked to the side.
 2. Leave comments, removals and edits.
-3. Open Claude Code in your **app's** project folder and say:
+3. Start your agent in your **app's** project folder and say:
 
    > Check the review comments.
 
-   Claude calls `list_comments`, then for each one `get_comment` (with the
+   The agent calls `list_comments`, then for each one `get_comment` (with the
    screenshot), `start_work` (shows **In progress**), fixes it in the code,
    optionally `capture_screenshot` to look at the result in your tab, and
    `submit_solution` with a short note (shows **Review ready**).
@@ -165,7 +189,7 @@ pnpm install
 pnpm demo        # http://localhost:5173
 ```
 
-Review it, then ask Claude Code "fix the review comments" in this repo. The list
+Review it, then ask your agent to "fix the review comments" in this repo. The list
 of flaws is in [demo/README.md](demo/README.md); `git checkout demo/` resets it.
 
 ### The overlay
@@ -222,13 +246,13 @@ sites.
 
 | Status | Set by | Meaning |
 |---|---|---|
-| Open | you | waiting for Claude |
-| In progress | Claude | Claude is working on it |
-| Review ready | Claude | fixed, with a note on how; waiting for you |
+| Open | you | waiting for your agent |
+| In progress | agent | your agent is working on it |
+| Review ready | agent | fixed, with a note on how; waiting for you |
 | Accepted | you | done |
 
-Claude can only set **In progress** and **Review ready**. Removals and edits are
-shown as a preview while the status is Open or In progress. When Claude marks it
+The agent can only set **In progress** and **Review ready**. Removals and edits are
+shown as a preview while the status is Open or In progress. When the agent marks it
 Review ready the preview turns off, so you see what the code really does now.
 **Undo removal** / **Undo edit** brings the element back and drops the task.
 
@@ -251,7 +275,7 @@ browser profile). Reloading or updating the extension keeps them; **removing the
 extension deletes them**.
 
 `browser-review-mcp` stores nothing. It listens on `ws://127.0.0.1:4777` and
-passes Claude's tool calls to the extension. With several Claude Code sessions,
+passes the agent's tool calls to the extension. With several agent sessions,
 the first one holds the port and the others go through it; when it closes,
 another takes over.
 
@@ -260,7 +284,7 @@ another takes over.
 - The bridge listens on 127.0.0.1 only and checks the `Host` header (no DNS
   rebinding).
 - Only the extension (a `chrome-extension://` or `moz-extension://` origin) may
-  connect as the extension, and only local non-browser processes (other Claude Code sessions)
+  connect as the extension, and only local non-browser processes (other agent sessions)
   as peers. Websites, including other localhost apps, get a 403.
 - The overlay only runs where you allow it (see [Where it works](#where-it-works)).
   Where it runs, it can read the page: that is how it picks elements, takes
@@ -268,7 +292,7 @@ another takes over.
   default except local addresses and dev domains, and you can make it stricter:
   localhost only.
 - Nothing leaves your machine: comments and screenshots stay in the browser and
-  only go to the Claude Code sessions on this computer.
+  only go to the agent sessions on this computer.
 
 ## Development
 

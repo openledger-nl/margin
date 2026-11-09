@@ -7,6 +7,7 @@ export type Status = (typeof STATUSES)[number];
 export const KINDS = ['comment', 'remove', 'edit'] as const;
 export type Kind = (typeof KINDS)[number];
 
+/** 'claude' means the coding agent, whichever one it is. The value stays 'claude' so stored comments keep loading. */
 export type Author = 'user' | 'claude' | 'system';
 
 export interface Rect {
@@ -176,3 +177,16 @@ export const DEFAULT_PORT = 4777;
 
 /** What the user runs once to add the MCP server to Claude Code. */
 export const MCP_ADD_COMMAND = 'claude mcp add --scope user browser-review -- npx -y browser-review-mcp@latest';
+
+/** The same for Codex. */
+export const MCP_ADD_COMMAND_CODEX = 'codex mcp add browser-review -- npx -y browser-review-mcp@latest';
+
+/** For any other MCP client that reads an mcpServers JSON config (Cursor, Gemini CLI and others). */
+export const MCP_JSON_CONFIG = `{
+  "mcpServers": {
+    "browser-review": {
+      "command": "npx",
+      "args": ["-y", "browser-review-mcp@latest"]
+    }
+  }
+}`;

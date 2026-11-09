@@ -5,7 +5,7 @@
 // stdout belongs to the MCP protocol: log to stderr only.
 import { readFileSync } from 'node:fs';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
-import { DEFAULT_PORT, MCP_ADD_COMMAND } from '@brm/shared';
+import { DEFAULT_PORT, MCP_ADD_COMMAND, MCP_ADD_COMMAND_CODEX } from '@brm/shared';
 import { Bridge } from './bridge.ts';
 import { buildMcpServer } from './mcp.ts';
 
@@ -22,10 +22,12 @@ if (arg === '--version' || arg === '-v') {
 if (arg === '--help' || arg === '-h') {
   console.log(`browser-review-mcp ${VERSION}
 
-MCP server for the Margin Browser Review browser extension. Claude Code starts it;
-you don't run it yourself. Add it to Claude Code once with:
+MCP server for the Margin Browser Review browser extension. Your coding agent
+starts it over stdio; you don't run it yourself. Add it to your agent once:
 
-  ${MCP_ADD_COMMAND}
+  Claude Code:  ${MCP_ADD_COMMAND}
+  Codex:        ${MCP_ADD_COMMAND_CODEX}
+  Other agents: command "npx", args ["-y", "browser-review-mcp@latest"]
 
 Environment: BRM_PORT (default ${DEFAULT_PORT}, the extension expects ${DEFAULT_PORT}).`);
   process.exit(0);

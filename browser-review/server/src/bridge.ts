@@ -98,11 +98,11 @@ export class Bridge implements BridgeLike {
       await this.#connectPeer();
       this.#mode = 'peer';
       this.#lastError = null;
-      this.#opts.log(`another Claude Code session has port ${this.#opts.port}, going through it`);
+      this.#opts.log(`another agent session has port ${this.#opts.port}, going through it`);
     } catch (err) {
       this.#retry(
         `Port ${this.#opts.port} is in use by another program (not Margin Browser Review), so the extension can't connect. ` +
-          `Free the port, then reconnect browser-review in Claude Code with /mcp. (${err instanceof Error ? err.message : String(err)})`,
+          `Free the port, then reconnect the browser-review MCP server in your agent (Claude Code: /mcp). (${err instanceof Error ? err.message : String(err)})`,
       );
     }
   }
@@ -243,7 +243,7 @@ export class Bridge implements BridgeLike {
       ws.on('close', () => {
         if (!opened) return;
         if (this.#upstream === ws) this.#upstream = null;
-        this.#failPending(ws, 'The Claude Code session that connected to the extension closed. Try again in a moment.');
+        this.#failPending(ws, 'The agent session that connected to the extension closed. Try again in a moment.');
         if (!this.#closed) {
           this.#opts.log('the hub went away, taking over');
           this.#retry('Reconnecting to the extension.');

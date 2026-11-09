@@ -254,7 +254,7 @@ export function Composer({ el, initialKind, draft, notice, previews, onCreated, 
         {notice && <p class="brm-note">{notice}</p>}
 
         {kind === 'remove' && (
-          <p class="brm-help">The element is hidden now. Claude removes it in the code. You can undo this in the sidebar.</p>
+          <p class="brm-help">The element is hidden now. Your agent removes it in the code. You can undo this in the sidebar.</p>
         )}
 
         {kind === 'edit' && (

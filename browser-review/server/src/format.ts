@@ -61,7 +61,7 @@ export function formatComment(c: Comment): string {
 
   out.push('', '## Thread');
   for (const m of c.messages) {
-    const who = m.author === 'user' ? 'User' : m.author === 'claude' ? 'Claude' : 'Status';
+    const who = m.author === 'user' ? 'User' : m.author === 'claude' ? 'Agent' : 'Status';
     out.push(`- ${who} (${m.createdAt}): ${m.body.replace(/\n/g, '\n  ')}`);
   }
 
