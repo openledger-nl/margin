@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatMillis, ID_PATTERN, newStamp } from './ids';
+import { createIds, fixedIds, formatMillis, ID_PATTERN } from './ids';
 import { ledgerConfigDir } from './locate';
 import { isInside, samePath } from './paths';
 import { slugify, uniqueSlug } from './slug';
@@ -7,12 +7,27 @@ import { slugify, uniqueSlug } from './slug';
 describe('ids', () => {
   it('are <epoch-millis>-<8 base36 chars> and sort chronologically, even within one millisecond', () => {
     const t = Date.UTC(2026, 10, 9, 10, 15, 0, 123);
-    const a = newStamp(t);
-    const b = newStamp(t);
+    const ids = createIds(() => t);
+    const a = ids.stamp();
+    const b = ids.stamp();
     expect(a.id).toMatch(/^\d{13}-[0-9a-z]{8}$/);
     expect(ID_PATTERN.test(a.id)).toBe(true);
     expect(b.id > a.id).toBe(true);
     expect(formatMillis(t)).toBe('2026-11-09T10:15:00.123Z');
+  });
+
+  it('can come from a fixed clock and seed, the same every time', () => {
+    const start = Date.UTC(2026, 10, 9, 10, 0, 0, 0);
+    const run = () => {
+      const ids = fixedIds(start, 1500);
+      return { a: ids.stamp(), now: ids.now(), b: ids.stamp() };
+    };
+    const { a, now, b } = run();
+    expect(run()).toEqual({ a, now, b });
+    expect(a.at).toBe('2026-11-09T10:00:00.000Z');
+    expect(now).toBe('2026-11-09T10:00:01.500Z');
+    expect(b.id).toMatch(/^1794218403000-[0-9a-z]{8}$/);
+    expect(a.id.slice(-8)).not.toBe(b.id.slice(-8));
   });
 });
 

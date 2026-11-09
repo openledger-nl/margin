@@ -14,7 +14,7 @@ import {
   REVIEW_KEYS, reviewFile, type ReviewMeta,
 } from './format';
 import { Frontmatter, normalizeBody } from './frontmatter';
-import { newStamp, now } from './ids';
+import { type Ids, systemIds } from './ids';
 import { slugify } from './slug';
 
 export interface ProjectInfo {
@@ -101,7 +101,11 @@ async function readFrontmatter(file: string): Promise<Frontmatter | undefined> {
 }
 
 export class Vault {
-  constructor(readonly root: string) {}
+  constructor(
+    readonly root: string,
+    /** Where ids and timestamps come from: the clock, unless a test wants every file to come out the same. */
+    readonly ids: Ids = systemIds,
+  ) {}
 
   get projectsDir(): string {
     return path.join(this.root, 'projects');
@@ -171,7 +175,7 @@ export class Vault {
         slug = `${base}-${n}`;
       }
     }
-    const createdAt = now();
+    const createdAt = this.ids.now();
     const fm = Frontmatter.create({ title: title.trim(), createdAt });
     await writeFileAtomic(path.join(threads, slug, 'thread.md'), fm.toString());
     return { project, slug, title: title.trim(), createdAt };
@@ -205,7 +209,7 @@ export class Vault {
     if (!(await exists(threadDir, 'dir'))) throw new GoneError(`The thread ${project}/${thread} is no longer in the vault.`);
     const dir = path.join(threadDir, 'reviews');
     await mkdir(dir, { recursive: true });
-    const stamp = newStamp();
+    const stamp = this.ids.stamp();
     const meta: ReviewMeta = { format: FORMAT, ...review, state: 'draft', createdAt: stamp.at, updatedAt: stamp.at };
     const file = path.join(dir, `${stamp.id}.md`);
     await writeFileAtomic(file, reviewFile(meta, summary).toString());
@@ -215,7 +219,7 @@ export class Vault {
   /** Changes some keys (undefined removes one) and, when given, the summary. Sets updatedAt. */
   async updateReview(file: string, changes: Partial<ReviewMeta>, summary?: string): Promise<ReviewRecord> {
     const fm = await this.editable(file);
-    patch(fm, { ...changes, updatedAt: changes.updatedAt ?? now() }, REVIEW_KEYS);
+    patch(fm, { ...changes, updatedAt: changes.updatedAt ?? this.ids.now() }, REVIEW_KEYS);
     if (summary !== undefined) fm.body = summary;
     await writeFileAtomic(file, fm.toString());
     const record = await this.readReview(file);
@@ -252,7 +256,7 @@ export class Vault {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') return;
       throw isMissing(error) ? gone() : error;
     });
-    const stamp = newStamp();
+    const stamp = this.ids.stamp();
     const meta: CommentMeta = { format: FORMAT, ...comment, createdAt: stamp.at, updatedAt: stamp.at };
     const file = path.join(dir, `${stamp.id}.md`);
     await writeFileAtomic(file, commentFile(meta, body).toString());
@@ -261,7 +265,7 @@ export class Vault {
 
   async updateComment(file: string, changes: Partial<CommentMeta>, body?: string): Promise<CommentRecord> {
     const fm = await this.editable(file);
-    patch(fm, { ...changes, updatedAt: changes.updatedAt ?? now() }, COMMENT_KEYS);
+    patch(fm, { ...changes, updatedAt: changes.updatedAt ?? this.ids.now() }, COMMENT_KEYS);
     if (body !== undefined) fm.body = body;
     await writeFileAtomic(file, fm.toString());
     const record = await this.readCommentFile(file);

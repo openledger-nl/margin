@@ -4,7 +4,6 @@ import { userInfo } from 'node:os';
 import { excerpt, type Hunk, splitLines } from './anchor';
 import type { ReviewMeta, Side, Verdict } from './format';
 import type { ChangedFile, Git } from './git';
-import { now } from './ids';
 import { buildConversations, type Conversation } from './model';
 import { place, type Placement, type PlacementSource, shownCommit } from './placement';
 import type { CommentRecord, ReviewRecord, Vault } from './vault';
@@ -238,7 +237,7 @@ export class ReviewSession implements PlacementSource {
   /** Makes the review final: verdict, summary and submittedAt. From then on it is read-only. */
   submit(verdict: Verdict, summary: string): Promise<void> {
     return this.mutate(async () => {
-      const at = now();
+      const at = this.vault.ids.now();
       this.record = await this.vault.updateReview(this.file, { state: 'submitted', verdict, submittedAt: at, updatedAt: at }, summary);
     });
   }

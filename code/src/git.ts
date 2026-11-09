@@ -69,7 +69,11 @@ export interface CommitInfo {
 }
 
 export class Git {
-  constructor(private readonly gitPath = 'git') {}
+  constructor(
+    private readonly gitPath = 'git',
+    /** Added to the environment git runs in (a test keeps the user's own git config out this way). */
+    private readonly env: Record<string, string> = {},
+  ) {}
 
   private exec(cwd: string, args: readonly string[], buffer: false): Promise<Result<string>>;
   private exec(cwd: string, args: readonly string[], buffer: true): Promise<Result<Buffer>>;
@@ -83,7 +87,7 @@ export class Git {
           encoding: buffer ? 'buffer' : 'utf8',
           maxBuffer: 512 * 1024 * 1024,
           windowsHide: true,
-          env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' },
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0', ...this.env },
         },
         (error, stdout, stderr) => {
           const err = String(stderr);
