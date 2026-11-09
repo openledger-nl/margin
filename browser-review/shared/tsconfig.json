@@ -1,6 +1,8 @@
 {
   "extends": "../tsconfig.base.json",
-  "compilerOptions": { "types": [] },
+  // No DOM and no Node: shared code runs in the page, the extension worker,
+  // the MCP server and the hub. Web globals it may use are declared in web.d.ts.
+  "compilerOptions": { "lib": ["es2024"], "types": [] },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts"]
 }
