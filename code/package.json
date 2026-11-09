@@ -356,7 +356,8 @@
     "typecheck": "tsc -p .",
     "test": "vitest run",
     "vscode:prepublish": "node build.mts --production",
-    "package": "vsce package --no-dependencies --skip-license"
+    "package": "vsce package --no-dependencies --skip-license",
+    "fixture": "node fixture.mts"
   },
   "dependencies": {
     "yaml": "^2.9.1"

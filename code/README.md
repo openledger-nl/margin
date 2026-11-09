@@ -71,7 +71,13 @@ pnpm install
 pnpm test        # vitest: the vault format, git, anchoring and a whole review against real repositories
 pnpm typecheck
 pnpm package     # builds dist/extension.js and margin-code-<version>.vsix
+pnpm fixture     # writes test/fixtures/ again (see below)
 ```
+
+`test/fixtures/vault/` is a small vault written by margin-code's own code, with a fixed clock, id seed and
+commit dates; `test/fixtures/CONTENTS.md` says what each file shows. Ledger's tests read it as margin-code's
+output, and `src/fixture.test.ts` fails when margin-code would write it differently. When a change is meant to
+change those files, run `pnpm fixture`, commit them, and tell the Ledger side.
 
 `pnpm watch` rebuilds on change; press F5 in VS Code with this folder open to try it in an Extension Development
 Host (add a launch configuration of type `extensionHost` first).
@@ -82,12 +88,13 @@ Host (add a launch configuration of type `extensionHost` first).
 src/
   format.ts, frontmatter.ts   the review format: reading and writing review and comment files
   vault.ts, atomic.ts         the vault on disk; atomic writes through a dotfile
-  locate.ts                   finding the vault
+  locate.ts, documents.ts     finding the vault; the Documents folder the way Ledger finds it
   ids.ts, slug.ts             Ledger's ids, timestamps and thread slugs
   git.ts, repoIdentity.ts     git through execFile (no shell); a repo's identity
   anchor.ts, placement.ts     where a comment's lines are now
   session.ts, model.ts        the active review: every change written at once
   publisher.ts                the seam for posting a submitted review to a forge (none yet)
+  fixture.ts                  writes the fixture vault in test/fixtures/
   ui/                         VS Code: the view, diffs, comments, Start/Resume/Submit
   extension.ts                wires it together
 ```
