@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatMillis, ID_PATTERN, newStamp } from './ids';
 import { ledgerConfigDir } from './locate';
+import { isInside, samePath } from './paths';
 import { slugify, uniqueSlug } from './slug';
 
 describe('ids', () => {
@@ -42,5 +43,16 @@ describe("Ledger's config folder", () => {
     expect(ledgerConfigDir({ env: { XDG_CONFIG_HOME: '/x' }, platform: 'linux', homedir: '/home/m' })).toBe('/x/nl.openledger.ledger');
     expect(ledgerConfigDir({ env: { XDG_CONFIG_HOME: 'relative' }, platform: 'linux', homedir: '/home/m' })).toBe('/home/m/.config/nl.openledger.ledger');
     expect(ledgerConfigDir({ env: { LEDGER_CONFIG_DIR: '/tmp/cfg' }, platform: 'linux', homedir: '/home/m' })).toBe('/tmp/cfg');
+  });
+});
+
+describe('paths', () => {
+  it('compare the way the file system does', () => {
+    expect(samePath('C:\\Vault\\a.md', 'c:\\vault\\A.md', 'win32')).toBe(true);
+    expect(isInside('c:\\vault\\projects\\p', 'C:\\Vault', 'win32')).toBe(true);
+    expect(isInside('C:\\Vault2\\x', 'C:\\Vault', 'win32')).toBe(false);
+    expect(isInside('C:\\Vault', 'C:\\Vault', 'win32')).toBe(false);
+    expect(samePath('/home/m/Vault', '/home/m/vault', 'linux')).toBe(false);
+    expect(isInside('/home/m/vault/x', '/home/m/vault/', 'linux')).toBe(true);
   });
 });
