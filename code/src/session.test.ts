@@ -1,5 +1,6 @@
 // A whole review against a real repository and a real vault folder.
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
@@ -7,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Frontmatter } from './frontmatter';
 import { Git } from './git';
 import { MissingCommitError, ReadOnlyError, ReviewSession } from './session';
-import { Vault } from './vault';
+import { GoneError, Vault } from './vault';
 
 const git = new Git();
 let repo: string;
@@ -152,6 +153,20 @@ describe('ReviewSession', () => {
     const text = await readFile(s.file, 'utf8');
     expect(text).toMatch(/state: submitted\nverdict: changes\nauthor: Rev Iewer\n/);
     expect(text.endsWith('\nPlease fix the nit.\n')).toBe(true);
+  });
+
+  it('writes nothing once its thread was deleted in Ledger', async () => {
+    const s = await open();
+    const c = await s.addComment({ side: 'new', path: 'app.js', line: 2 }, 'first');
+    const thread = path.join(vaultRoot, 'projects', 'p', 'threads', 't');
+    await rm(thread, { recursive: true, force: true });
+    await expect(s.addComment({ side: 'new', path: 'app.js', line: 3 }, 'second')).rejects.toBeInstanceOf(GoneError);
+    await expect(s.reply(c.id, 'reply')).rejects.toBeInstanceOf(GoneError);
+    await expect(s.setResolved(c.id, true)).rejects.toBeInstanceOf(GoneError);
+    await expect(s.submit('approve', '')).rejects.toBeInstanceOf(GoneError);
+    expect(existsSync(thread)).toBe(false);
+    await expect(vault.createReview('p', 't', { repo: 'x', repoName: 'r', base, head, author: 'R' })).rejects.toBeInstanceOf(GoneError);
+    expect(existsSync(thread)).toBe(false);
   });
 
   it('says which commits a clone is missing', async () => {

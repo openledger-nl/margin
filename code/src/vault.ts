@@ -6,7 +6,7 @@
 //   projects/<project>/threads/<thread>/reviews/<review>/<comment>.md   a comment in it, or a reply
 //
 // Nothing here knows about VS Code, so it is tested against real folders.
-import { mkdir, readdir, readFile, rm, rmdir } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, rmdir, stat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomic';
 import {
@@ -56,6 +56,23 @@ export class UnsupportedFormatError extends Error {
     super(`${path.basename(file)} has format ${format}, newer than this margin-code knows (${FORMAT}); it is left untouched.`);
   }
 }
+
+/**
+ * The review or its thread is no longer in the vault (deleted in Ledger, say). Nothing is written then: writing
+ * would bring back the folders Ledger just removed, as a thread without its thread.md.
+ */
+export class GoneError extends Error {}
+
+async function exists(p: string, kind: 'file' | 'dir'): Promise<boolean> {
+  try {
+    const s = await stat(p);
+    return kind === 'file' ? s.isFile() : s.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+const isMissing = (error: unknown) => (error as NodeJS.ErrnoException).code === 'ENOENT';
 
 async function entries(dir: string) {
   try {
@@ -184,7 +201,9 @@ export class Vault {
   }
 
   async createReview(project: string, thread: string, review: NewReview, summary = ''): Promise<ReviewRecord> {
-    const dir = path.join(this.threadDir(project, thread), 'reviews');
+    const threadDir = this.threadDir(project, thread);
+    if (!(await exists(threadDir, 'dir'))) throw new GoneError(`The thread ${project}/${thread} is no longer in the vault.`);
+    const dir = path.join(threadDir, 'reviews');
     await mkdir(dir, { recursive: true });
     const stamp = newStamp();
     const meta: ReviewMeta = { format: FORMAT, ...review, state: 'draft', createdAt: stamp.at, updatedAt: stamp.at };
@@ -225,8 +244,14 @@ export class Vault {
   }
 
   async createComment(reviewFile: string, comment: NewComment, body: string): Promise<CommentRecord> {
+    const gone = () => new GoneError(`The review ${this.relative(reviewFile)} is no longer in the vault.`);
+    if (!(await exists(reviewFile, 'file'))) throw gone();
     const dir = this.commentsDir(reviewFile);
-    await mkdir(dir, { recursive: true });
+    // Only the review's own folder: its parents are there, unless the review was removed meanwhile.
+    await mkdir(dir).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') return;
+      throw isMissing(error) ? gone() : error;
+    });
     const stamp = newStamp();
     const meta: CommentMeta = { format: FORMAT, ...comment, createdAt: stamp.at, updatedAt: stamp.at };
     const file = path.join(dir, `${stamp.id}.md`);
@@ -257,7 +282,9 @@ export class Vault {
 
   /** A file's frontmatter, ready to change; throws for a file that is missing, unreadable or of a newer format. */
   private async editable(file: string): Promise<Frontmatter> {
-    const text = await readFile(file, 'utf8');
+    const text = await readFile(file, 'utf8').catch((error: unknown) => {
+      throw isMissing(error) ? new GoneError(`${this.relative(file)} is no longer in the vault.`) : error;
+    });
     const fm = Frontmatter.parse(text);
     if (!fm) throw new Error(`${this.relative(file)} has no readable frontmatter; it is left as it is.`);
     const format = formatOf(fm);

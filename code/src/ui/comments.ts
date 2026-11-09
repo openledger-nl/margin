@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import { fileOnSide, type Placement, shownCommit } from '../placement';
 import { ReadOnlyError, type ReviewSession, type Target } from '../session';
-import type { CommentRecord } from '../vault';
+import { type CommentRecord, GoneError } from '../vault';
 import type { Controller } from './controller';
 import type { GitContentProvider } from './documents';
 import { parseSideUri, short, sideUri } from './uris';
@@ -80,6 +80,10 @@ export class CommentsUi implements vscode.Disposable {
     } catch (error) {
       const text = errorText(error);
       if (error instanceof ReadOnlyError) void vscode.window.showInformationMessage(text);
+      else if (error instanceof GoneError) {
+        void vscode.window.showWarningMessage(`${text} Nothing was written.`);
+        this.margin.scheduleReload(); // closes the review once it is gone
+      }
       else void vscode.window.showErrorMessage(`Margin: ${text}`);
     }
   }
