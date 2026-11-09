@@ -1,0 +1,374 @@
+{
+  "name": "margin-code",
+  "displayName": "Margin",
+  "description": "Review any local git repository in VS Code and keep the review in your Ledger vault as markdown.",
+  "version": "0.1.0",
+  "publisher": "openledger",
+  "private": true,
+  "packageManager": "pnpm@12.9.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openledger-nl/margin.git",
+    "directory": "code"
+  },
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "code review",
+    "review",
+    "git",
+    "diff",
+    "comments",
+    "ledger",
+    "markdown"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onFileSystem:margin"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Margin runs git in your repositories, and a repository's own git config can make git run other programs."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Margin runs git on repositories on this machine."
+    }
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Margin",
+      "properties": {
+        "margin.vaultPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "The folder of your Ledger vault. When empty, Margin uses the `LEDGER_VAULT` environment variable, else the vault Ledger itself uses: `vaultPath` in Ledger's `config.json`, else Ledger's default (`Ledger` in your Documents folder). Per machine: not synced."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "margin.startReview",
+        "title": "Start Review",
+        "category": "Margin",
+        "icon": "$(add)"
+      },
+      {
+        "command": "margin.resumeReview",
+        "title": "Resume Review",
+        "category": "Margin",
+        "icon": "$(history)"
+      },
+      {
+        "command": "margin.submitReview",
+        "title": "Submit Review",
+        "category": "Margin",
+        "icon": "$(check)",
+        "enablement": "margin.draft"
+      },
+      {
+        "command": "margin.moveToHead",
+        "title": "Move Review to HEAD",
+        "category": "Margin",
+        "enablement": "margin.draft"
+      },
+      {
+        "command": "margin.closeReview",
+        "title": "Close Review",
+        "category": "Margin",
+        "icon": "$(close)",
+        "enablement": "margin.active"
+      },
+      {
+        "command": "margin.refresh",
+        "title": "Refresh Review",
+        "category": "Margin",
+        "icon": "$(refresh)",
+        "enablement": "margin.active"
+      },
+      {
+        "command": "margin.chooseVault",
+        "title": "Choose Ledger Vault Folder…",
+        "category": "Margin"
+      },
+      {
+        "command": "margin.openDiff",
+        "title": "Open Diff",
+        "category": "Margin"
+      },
+      {
+        "command": "margin.commentOnFile",
+        "title": "Comment on File",
+        "category": "Margin",
+        "icon": "$(comment)"
+      },
+      {
+        "command": "margin.openOutdated",
+        "title": "Show Conversation",
+        "category": "Margin"
+      },
+      {
+        "command": "margin.comment.create",
+        "title": "Add Comment",
+        "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "margin.comment.reply",
+        "title": "Reply",
+        "enablement": "!commentIsEmpty"
+      },
+      {
+        "command": "margin.comment.edit",
+        "title": "Edit",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "margin.comment.delete",
+        "title": "Delete",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "margin.comment.save",
+        "title": "Save"
+      },
+      {
+        "command": "margin.comment.cancel",
+        "title": "Cancel"
+      },
+      {
+        "command": "margin.thread.resolve",
+        "title": "Resolve",
+        "icon": "$(check)"
+      },
+      {
+        "command": "margin.thread.unresolve",
+        "title": "Reopen",
+        "icon": "$(issue-reopened)"
+      },
+      {
+        "command": "margin.summary.submit",
+        "title": "Submit Review",
+        "icon": "$(check)"
+      },
+      {
+        "command": "margin.summary.keepDraft",
+        "title": "Keep Summary in Draft",
+        "icon": "$(save)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "margin",
+          "title": "Margin",
+          "icon": "media/margin.svg"
+        }
+      ]
+    },
+    "views": {
+      "margin": [
+        {
+          "id": "margin.review",
+          "name": "Review",
+          "icon": "media/margin.svg",
+          "contextualTitle": "Margin"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "margin.review",
+        "when": "!margin.active",
+        "contents": "Review the changes on a branch, comment inline, and keep the review in your Ledger vault.\n[Start Review](command:margin.startReview)\n[Resume Review](command:margin.resumeReview)\nDraft reviews from your other machines arrive through Ledger's sync."
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "margin.submitReview",
+          "when": "view == margin.review && margin.draft",
+          "group": "navigation@1"
+        },
+        {
+          "command": "margin.refresh",
+          "when": "view == margin.review && margin.active",
+          "group": "navigation@2"
+        },
+        {
+          "command": "margin.closeReview",
+          "when": "view == margin.review && margin.active",
+          "group": "navigation@3"
+        },
+        {
+          "command": "margin.startReview",
+          "when": "view == margin.review",
+          "group": "1_review@1"
+        },
+        {
+          "command": "margin.resumeReview",
+          "when": "view == margin.review",
+          "group": "1_review@2"
+        },
+        {
+          "command": "margin.moveToHead",
+          "when": "view == margin.review && margin.draft",
+          "group": "1_review@3"
+        },
+        {
+          "command": "margin.chooseVault",
+          "when": "view == margin.review",
+          "group": "2_vault@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "margin.commentOnFile",
+          "when": "view == margin.review && viewItem == margin-file-draft",
+          "group": "inline"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "margin.comment.create",
+          "group": "inline",
+          "when": "commentController == margin && commentThreadIsEmpty"
+        },
+        {
+          "command": "margin.comment.reply",
+          "group": "inline",
+          "when": "commentController == margin && !commentThreadIsEmpty"
+        }
+      ],
+      "comments/commentThread/title": [
+        {
+          "command": "margin.thread.resolve",
+          "group": "inline",
+          "when": "commentController == margin && commentThread == margin-unresolved"
+        },
+        {
+          "command": "margin.thread.unresolve",
+          "group": "inline",
+          "when": "commentController == margin && commentThread == margin-resolved"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "margin.comment.edit",
+          "group": "inline@1",
+          "when": "commentController == margin && comment == margin-editable"
+        },
+        {
+          "command": "margin.comment.delete",
+          "group": "inline@2",
+          "when": "commentController == margin && comment == margin-editable"
+        }
+      ],
+      "comments/comment/context": [
+        {
+          "command": "margin.comment.cancel",
+          "group": "inline@1",
+          "when": "commentController == margin && comment == margin-editable"
+        },
+        {
+          "command": "margin.comment.save",
+          "group": "inline@2",
+          "when": "commentController == margin && comment == margin-editable"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "margin.summary.keepDraft",
+          "group": "navigation@1",
+          "when": "margin.writingSummary && resourceFilename =~ /^summary-.*\\.md$/"
+        },
+        {
+          "command": "margin.summary.submit",
+          "group": "navigation@2",
+          "when": "margin.writingSummary && resourceFilename =~ /^summary-.*\\.md$/"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "margin.openDiff",
+          "when": "false"
+        },
+        {
+          "command": "margin.commentOnFile",
+          "when": "false"
+        },
+        {
+          "command": "margin.openOutdated",
+          "when": "false"
+        },
+        {
+          "command": "margin.comment.create",
+          "when": "false"
+        },
+        {
+          "command": "margin.comment.reply",
+          "when": "false"
+        },
+        {
+          "command": "margin.comment.edit",
+          "when": "false"
+        },
+        {
+          "command": "margin.comment.delete",
+          "when": "false"
+        },
+        {
+          "command": "margin.comment.save",
+          "when": "false"
+        },
+        {
+          "command": "margin.comment.cancel",
+          "when": "false"
+        },
+        {
+          "command": "margin.thread.resolve",
+          "when": "false"
+        },
+        {
+          "command": "margin.thread.unresolve",
+          "when": "false"
+        },
+        {
+          "command": "margin.summary.submit",
+          "when": "false"
+        },
+        {
+          "command": "margin.summary.keepDraft",
+          "when": "false"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node build.mts",
+    "watch": "node build.mts --watch",
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "vscode:prepublish": "node build.mts --production",
+    "package": "vsce package --no-dependencies --skip-license",
+    "fixture": "node fixture.mts"
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/vscode": "1.100.0",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "vscode-uri": "^3.2.0"
+  }
+}
