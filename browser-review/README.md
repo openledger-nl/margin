@@ -213,11 +213,11 @@ of flaws is in [demo/README.md](demo/README.md); `git checkout demo/` resets it.
 | Send a comment or reply | Enter (Shift+Enter for a new line). Prefer Enter for new lines? On the help page, set **Send** to Ctrl+Enter |
 | Cancel | Esc |
 
-If all saved selectors stop matching after a redeploy, Browser Review looks for
-the same tag and non-empty text, choosing the closest rectangle center when text
-is repeated. It also uses that text to recover when the final positional path
-shifts to a different element. If the old text is gone, the positional hit stays;
-id and attribute selector hits always keep priority.
+Pins find their element again after your app changes. When elements are added or
+removed around it, its position-based selector can point at the wrong element or
+none; Browser Review then looks for an element with the same tag and text. If the
+text itself was changed, the pin stays where it was. Selectors based on an id or
+attribute always win.
 
 After the extension is reloaded or updated, a page that was already open shows
 "Margin Browser Review was reloaded" with a **Reload page** button: browsers don't put

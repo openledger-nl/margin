@@ -361,10 +361,8 @@
           your agent knows exactly what you mean. What you type survives a reload of your app.
         </p>
         <p>
-          If all saved selectors stop matching after a redeploy, pins look for the same tag and non-empty text.
-          Repeated text is resolved by the closest rectangle center. The same text also recovers pins when the
-          final positional path shifts to a different element. If the old text is gone, the positional hit stays;
-          id and attribute selector hits always keep priority.
+          Pins find their element again after your app changes, also when elements were added or removed around
+          it: if the element can't be found by its position anymore, Browser Review looks for its text.
         </p>
       </section>
 
