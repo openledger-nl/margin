@@ -3,6 +3,7 @@
 // ws://127.0.0.1:4777. Claude's tool calls arrive here as "call" messages.
 import {
   DEFAULT_PORT,
+  cropBox,
   pageKey,
   type BridgeCalls,
   type BridgeMethod,
@@ -43,6 +44,7 @@ import {
 } from './sites.ts';
 import { IdbDb } from './idb.ts';
 import { Store } from './store.ts';
+import { cropToPng } from './crop.ts';
 
 const WS_URL = `ws://127.0.0.1:${DEFAULT_PORT}/ws`;
 const VERSION = chrome.runtime.getManifest().version;
@@ -369,12 +371,6 @@ async function runStoreOp(op: keyof StoreOps, args: unknown): Promise<unknown> {
 
 // ---------- screenshots ----------
 
-function toDataUrl(bytes: Uint8Array): string {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return `data:image/png;base64,${btoa(bin)}`;
-}
-
 let lastCapture = 0;
 
 /** Visible-tab screenshot plus an optional crop around rect (CSS pixels). */
@@ -387,19 +383,8 @@ async function capture(windowId: number, rect: Rect | null, viewport: Viewport):
   if (!rect || rect.width <= 0 || rect.height <= 0) return { page, element: null };
 
   const bitmap = await createImageBitmap(await (await fetch(page)).blob());
-  const scale = bitmap.width / viewport.width;
-  const pad = 12;
-  const x0 = Math.max(0, Math.floor((rect.x - pad) * scale));
-  const y0 = Math.max(0, Math.floor((rect.y - pad) * scale));
-  const x1 = Math.min(bitmap.width, Math.ceil((rect.x + rect.width + pad) * scale));
-  const y1 = Math.min(bitmap.height, Math.ceil((rect.y + rect.height + pad) * scale));
-  if (x1 - x0 < 2 || y1 - y0 < 2) return { page, element: null };
-  const canvas = new OffscreenCanvas(x1 - x0, y1 - y0);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return { page, element: null };
-  ctx.drawImage(bitmap, x0, y0, x1 - x0, y1 - y0, 0, 0, x1 - x0, y1 - y0);
-  const blob = await canvas.convertToBlob({ type: 'image/png' });
-  return { page, element: toDataUrl(new Uint8Array(await blob.arrayBuffer())) };
+  const box = cropBox(rect, bitmap, bitmap.width / viewport.width);
+  return { page, element: box ? await cropToPng(bitmap, box) : null };
 }
 
 /** Live screenshot asked for by Claude over MCP. */

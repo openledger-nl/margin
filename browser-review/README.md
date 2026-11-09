@@ -304,6 +304,11 @@ another takes over.
 
 Needs Node 26 (`nvm use` reads `.nvmrc`) and pnpm.
 
+Comment validation and status decisions live in `shared/src/rules.ts`; stores
+own persistence, counters and URL policy. `shared/src/crop.ts` calculates padded
+pixel boxes without browser APIs; `extension/src/crop.ts` draws them to PNG.
+`pnpm test` includes the shared crop boundary tests.
+
 ### Run the extension from source (hot reload)
 
 1. Install once:

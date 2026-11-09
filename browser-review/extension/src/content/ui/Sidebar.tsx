@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { KIND_LABELS, STATUS_LABELS, type Comment, type Status } from '@brm/shared';
+import { canDelete, KIND_LABELS, STATUS_LABELS, type Comment, type Status } from '@brm/shared';
 import { bridge } from '../bridge.ts';
 import { describe } from '../targets.ts';
 import { replyDraft } from '../drafts.ts';
@@ -306,7 +306,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
     }
   }
 
-  const canUndo = c.kind !== 'comment' && (c.status === 'open' || c.status === 'in_progress');
+  const canUndo = c.kind !== 'comment' && canDelete(c);
 
   return (
     <article
@@ -427,7 +427,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
                 Undo {c.kind === 'remove' ? 'removal' : 'edit'}
               </button>
             )}
-            {c.kind === 'comment' && c.status !== 'in_progress' && (
+            {c.kind === 'comment' && canDelete(c) && (
               <button
                 class="brm-btn"
                 disabled={busy}

@@ -1,6 +1,9 @@
 // Types and small helpers shared by the MCP process and the extension.
 // Keep this file free of Node or DOM APIs: it runs in both places.
 
+export { ReviewError, decide, checkCreate, canDelete, checkPngDataUrl, type ReviewErrorCode, type Action, type Outcome } from './rules.ts';
+export { cropBox } from './crop.ts';
+
 export const STATUSES = ['open', 'in_progress', 'review_ready', 'accepted'] as const;
 export type Status = (typeof STATUSES)[number];
 

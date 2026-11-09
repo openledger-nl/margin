@@ -1,7 +1,7 @@
 import { beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import type { CreateCommentInput } from '@brm/shared';
-import { MemoryDb, Store, StoreError } from './store.ts';
+import { ReviewError, type CreateCommentInput } from '@brm/shared';
+import { MemoryDb, Store } from './store.ts';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
 
@@ -29,10 +29,10 @@ const code = async (p: Promise<unknown>) => {
   try {
     await p;
   } catch (err) {
-    assert.ok(err instanceof StoreError);
+    assert.ok(err instanceof ReviewError);
     return err.code;
   }
-  assert.fail('expected a StoreError');
+  assert.fail('expected a ReviewError');
 };
 
 let db: MemoryDb;
