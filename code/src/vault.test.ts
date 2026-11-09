@@ -179,29 +179,62 @@ describe('writeFileAtomic', () => {
 });
 
 describe('locateVault', () => {
-  const base = { platform: process.platform, homedir: root };
+  // `root` is set per test, so the input is made per test too. No Documents folder unless a test gives one.
+  const base = () => ({ platform: process.platform, homedir: root, documents: async () => undefined });
 
   it('takes the setting first, then LEDGER_VAULT, then Ledger config.json', async () => {
     const cfg = path.join(root, 'cfg');
     await mkdir(cfg);
     await writeFile(path.join(cfg, 'config.json'), JSON.stringify({ vaultPath: root, updates: { automatic: true } }));
     const env = { LEDGER_CONFIG_DIR: cfg };
-    expect(await locateVault({ ...base, setting: root, env: { LEDGER_VAULT: '/nope' } })).toEqual({ ok: true, path: root, source: 'setting' });
-    expect(await locateVault({ ...base, setting: '', env: { ...env, LEDGER_VAULT: root } })).toEqual({ ok: true, path: root, source: 'env' });
-    expect(await locateVault({ ...base, setting: undefined, env })).toEqual({ ok: true, path: root, source: 'config' });
+    expect(await locateVault({ ...base(), setting: root, env: { LEDGER_VAULT: '/nope' } })).toEqual({ ok: true, path: root, source: 'setting' });
+    expect(await locateVault({ ...base(), setting: '', env: { ...env, LEDGER_VAULT: root } })).toEqual({ ok: true, path: root, source: 'env' });
+    expect(await locateVault({ ...base(), setting: undefined, env })).toEqual({ ok: true, path: root, source: 'config' });
+  });
+
+  it("falls back to Ledger's default: Ledger in Documents", async () => {
+    const documents = path.join(root, 'My Documents');
+    await mkdir(path.join(documents, 'Ledger'), { recursive: true });
+    const input = { ...base(), documents: async () => documents, setting: undefined };
+    const expected = { ok: true, path: path.join(documents, 'Ledger'), source: 'default' };
+    // No config.json, one without vaultPath, an unreadable one: Ledger reads all three as "use the default".
+    const cfg = path.join(root, 'cfg');
+    expect(await locateVault({ ...input, env: { LEDGER_CONFIG_DIR: cfg } })).toEqual(expected);
+    await mkdir(cfg);
+    for (const text of ['{"updates":{}}', '{"vaultPath":"  "}', '{"vaultPath":42}', 'not json', 'null']) {
+      await writeFile(path.join(cfg, 'config.json'), text);
+      expect(await locateVault({ ...input, env: { LEDGER_CONFIG_DIR: cfg } }), text).toEqual(expected);
+    }
+  });
+
+  it('falls back to vault in Ledger\'s config folder when there is no Documents folder', async () => {
+    const cfg = path.join(root, 'cfg');
+    await mkdir(path.join(cfg, 'vault'), { recursive: true });
+    expect(await locateVault({ ...base(), setting: undefined, env: { LEDGER_CONFIG_DIR: cfg } })).toEqual({
+      ok: true,
+      path: path.join(cfg, 'vault'),
+      source: 'default',
+    });
   });
 
   it('says plainly why there is no vault', async () => {
-    const missing = await locateVault({ ...base, setting: undefined, env: { LEDGER_CONFIG_DIR: path.join(root, 'none') } });
-    expect(missing.ok).toBe(false);
-    const wrong = await locateVault({ ...base, setting: path.join(root, 'nope'), env: {} });
-    expect(wrong).toMatchObject({ ok: false, reason: expect.stringContaining("isn't a folder") });
-    const cfg = path.join(root, 'cfg2');
-    await mkdir(cfg);
-    await writeFile(path.join(cfg, 'config.json'), '{"updates":{}}');
-    expect(await locateVault({ ...base, setting: undefined, env: { LEDGER_CONFIG_DIR: cfg } })).toMatchObject({
+    const documents = path.join(root, 'Documents');
+    await mkdir(documents);
+    const missing = await locateVault({ ...base(), documents: async () => documents, setting: undefined, env: { LEDGER_CONFIG_DIR: path.join(root, 'none') } });
+    expect(missing).toEqual({
       ok: false,
-      reason: expect.stringContaining('no vaultPath'),
+      reason: `margin.vaultPath, LEDGER_VAULT and Ledger's config.json name no vault, and Ledger's default vault (${path.join(documents, 'Ledger')}) isn't there.`,
+    });
+    const wrong = await locateVault({ ...base(), setting: path.join(root, 'nope'), env: {} });
+    expect(wrong).toMatchObject({ ok: false, reason: expect.stringContaining("isn't a folder") });
+    // A config.json that names a folder that isn't there is an error, not a reason to try the default.
+    const cfg = path.join(root, 'cfg');
+    await mkdir(cfg);
+    await mkdir(path.join(documents, 'Ledger'));
+    await writeFile(path.join(cfg, 'config.json'), JSON.stringify({ vaultPath: path.join(root, 'moved') }));
+    expect(await locateVault({ ...base(), documents: async () => documents, setting: undefined, env: { LEDGER_CONFIG_DIR: cfg } })).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining("Ledger's config.json points to"),
     });
   });
 });

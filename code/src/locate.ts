@@ -2,9 +2,12 @@
 //   1. the `margin.vaultPath` setting;
 //   2. else the LEDGER_VAULT environment variable;
 //   3. else `vaultPath` in config.json in Ledger's config folder for the app id nl.openledger.ledger
-//      (LEDGER_CONFIG_DIR, when set, replaces that folder).
+//      (LEDGER_CONFIG_DIR, when set, replaces that folder);
+//   4. else Ledger's own default: `Ledger` in the user's Documents folder, or `vault` in Ledger's config folder
+//      when there is no Documents folder (settings::resolve_vault in Ledger). Only when that folder exists.
 import { readFile, stat } from 'node:fs/promises';
 import * as path from 'node:path';
+import { documentsDir } from './documents';
 
 export const LEDGER_APP_ID = 'nl.openledger.ledger';
 
@@ -13,9 +16,11 @@ export interface LocateInput {
   env: Record<string, string | undefined>;
   platform: NodeJS.Platform;
   homedir: string;
+  /** The Documents folder; by default the one Ledger would use (see documents.ts). */
+  documents?: () => Promise<string | undefined>;
 }
 
-export type VaultSource = 'setting' | 'env' | 'config';
+export type VaultSource = 'setting' | 'env' | 'config' | 'default';
 
 export type Located =
   | { ok: true; path: string; source: VaultSource }
@@ -46,40 +51,49 @@ async function isDirectory(dir: string): Promise<boolean> {
   }
 }
 
+const FROM: Record<Exclude<VaultSource, 'default'>, string> = {
+  setting: 'The margin.vaultPath setting',
+  env: 'LEDGER_VAULT',
+  config: "Ledger's config.json",
+};
+
 /** Where the vault is, and where that came from; or why there is none. The first source that names one wins. */
 export async function locateVault(input: LocateInput): Promise<Located> {
-  const chosen = await choose(input);
-  if (!chosen.ok) return chosen;
-  if (!(await isDirectory(chosen.path))) {
-    const from =
-      chosen.source === 'setting' ? 'The margin.vaultPath setting' : chosen.source === 'env' ? 'LEDGER_VAULT' : "Ledger's config.json";
-    return { ok: false, reason: `${from} points to ${chosen.path}, which isn't a folder on this machine.` };
+  const named = await namedVault(input);
+  if (named) {
+    if (!(await isDirectory(named.path))) {
+      return { ok: false, reason: `${FROM[named.source]} points to ${named.path}, which isn't a folder on this machine.` };
+    }
+    return { ok: true, ...named };
   }
-  return chosen;
+
+  // 4. Nothing names a vault: Ledger then uses its default, and so does Margin, once Ledger has made it.
+  const documents = await (input.documents ?? (() => documentsDir(input)))();
+  const fallback = documents ? path.join(documents, 'Ledger') : path.join(ledgerConfigDir(input), 'vault');
+  if (await isDirectory(fallback)) return { ok: true, path: fallback, source: 'default' };
+  return {
+    ok: false,
+    reason: `margin.vaultPath, LEDGER_VAULT and Ledger's config.json name no vault, and Ledger's default vault (${fallback}) isn't there.`,
+  };
 }
 
-async function choose(input: LocateInput): Promise<Located> {
+/** The vault the setting, LEDGER_VAULT or Ledger's config.json names, if one does. */
+async function namedVault(input: LocateInput): Promise<{ path: string; source: Exclude<VaultSource, 'default'> } | undefined> {
   const setting = input.setting?.trim();
-  if (setting) return { ok: true, path: path.resolve(expandHome(setting, input.homedir)), source: 'setting' };
+  if (setting) return { path: path.resolve(expandHome(setting, input.homedir)), source: 'setting' };
 
   const env = input.env.LEDGER_VAULT?.trim();
-  if (env) return { ok: true, path: path.resolve(env), source: 'env' };
+  if (env) return { path: path.resolve(env), source: 'env' };
 
-  const configFile = path.join(ledgerConfigDir(input), 'config.json');
-  let text: string;
-  try {
-    text = await readFile(configFile, 'utf8');
-  } catch {
-    return { ok: false, reason: `No vault is set: margin.vaultPath and LEDGER_VAULT are empty, and Ledger's ${configFile} isn't there.` };
-  }
+  // Read the way Ledger reads it: a missing or unreadable config.json, or one without a vaultPath text, names none.
+  const text = await readFile(path.join(ledgerConfigDir(input), 'config.json'), 'utf8').catch(() => undefined);
+  if (text === undefined) return undefined;
   let vaultPath: unknown;
   try {
-    vaultPath = (JSON.parse(text) as { vaultPath?: unknown }).vaultPath;
+    vaultPath = (JSON.parse(text) as { vaultPath?: unknown } | null)?.vaultPath;
   } catch {
-    return { ok: false, reason: `Ledger's ${configFile} isn't valid JSON.` };
+    return undefined;
   }
-  if (typeof vaultPath !== 'string' || vaultPath.trim() === '') {
-    return { ok: false, reason: `Ledger's ${configFile} has no vaultPath. Ledger may be using its default vault; set margin.vaultPath to it.` };
-  }
-  return { ok: true, path: path.resolve(vaultPath.trim()), source: 'config' };
+  if (typeof vaultPath !== 'string' || vaultPath.trim() === '') return undefined;
+  return { path: path.resolve(vaultPath.trim()), source: 'config' };
 }

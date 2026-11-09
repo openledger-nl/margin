@@ -45,7 +45,8 @@ The window remembers its review: reopen it and the review is back. **Margin: Clo
 | `margin.vaultPath` | The Ledger vault folder. Per machine, not synced. |
 
 When it is empty, Margin uses the `LEDGER_VAULT` environment variable, else the vault Ledger itself uses
-(`vaultPath` in Ledger's `config.json`). If none is found, Margin says so and offers to choose the folder.
+(`vaultPath` in Ledger's `config.json`, else Ledger's default: `Ledger` in your Documents folder). If none is
+found, Margin says so and offers to choose the folder.
 
 Margin runs `git` from your PATH, or the one in VS Code's `git.path` setting. It doesn't run in untrusted
 workspaces: a repository's own git config can make git run other programs.
@@ -163,6 +164,7 @@ The comment in markdown.
 1. The `margin.vaultPath` setting.
 2. Else the `LEDGER_VAULT` environment variable.
 3. Else `vaultPath` in `config.json` in Ledger's config folder for the app id `nl.openledger.ledger`: `%APPDATA%\nl.openledger.ledger\` on Windows, `~/Library/Application Support/nl.openledger.ledger/` on macOS, `$XDG_CONFIG_HOME` or `~/.config` plus `nl.openledger.ledger/` on Linux. `LEDGER_CONFIG_DIR`, when set, replaces that folder.
+4. Else Ledger's own default, as Ledger falls back to when `config.json` is missing, unreadable or has no `vaultPath`: `Ledger` in the user's Documents folder, or `vault` in Ledger's config folder when there is no Documents folder. The Documents folder is the one Tauri's `document_dir` gives: the known folder `FOLDERID_Documents` on Windows (which may be redirected, to OneDrive say), `~/Documents` on macOS, and `XDG_DOCUMENTS_DIR` from `user-dirs.dirs` on Linux (none when it isn't set there). Only when that folder exists.
 
 ### How margin-code fills in what the contract leaves open
 
