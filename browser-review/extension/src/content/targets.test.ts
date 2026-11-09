@@ -2,7 +2,7 @@ import { afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Rect, TargetInfo } from '@brm/shared';
 import { parseHTML } from 'linkedom';
-import { findTarget, HOST_TAG, textOf } from './targets.ts';
+import { buildSelectors, findTarget, HOST_TAG, textOf } from './targets.ts';
 
 const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
 afterEach(() => {
@@ -46,9 +46,45 @@ describe('findTarget', () => {
     assert.equal(findTarget({ ...target, selectors: ['#first', '#second'] }), element('first'));
   });
 
-  it('keeps a positional-path hit even when its text has changed', () => {
-    page('<main><p id="edited">Edited text</p><p id="old">Pinned text</p></main>');
-    assert.equal(findTarget({ ...target, selectors: ['body > main > p:nth-of-type(1)'] }), element('edited'));
+  it('recovers the target when a sibling is inserted before its positional path', () => {
+    page('<main><p>Before</p><p>Pinned text</p></main>');
+    const pinned = document.querySelector('p:last-child')!;
+    const stored = { ...target, selectors: buildSelectors(pinned) };
+    const inserted = document.createElement('p');
+    inserted.textContent = 'Inserted sibling';
+    pinned.before(inserted);
+    assert.equal(findTarget(stored), pinned);
+  });
+
+  it('keeps a positional-path hit when its text was edited in place', () => {
+    page(`<main><p>Before</p><p id="edited">Edited text</p></main>
+      <div>Pinned text</div><${HOST_TAG}><p>Pinned text</p></${HOST_TAG}>`);
+    const edited = element('edited');
+    assert.equal(findTarget({ ...target, selectors: ['body > main > p:nth-of-type(2)'] }), edited);
+  });
+
+  it('keeps a direct id selector with changed text authoritative, even when it is last', () => {
+    page('<p id="edited">Edited text</p><p>Pinned text</p>');
+    assert.equal(findTarget({ ...target, selectors: ['#edited'] }), element('edited'));
+  });
+
+  it('keeps an attribute selector with changed text authoritative, even when it is last', () => {
+    page('<p id="edited" aria-label="Save">Edited text</p><p>Pinned text</p>');
+    assert.equal(findTarget({ ...target, selectors: ['p[aria-label="Save"]'] }), element('edited'));
+  });
+
+  it('does not override an earlier positional selector', () => {
+    page('<main><p id="edited">Edited text</p><p>Pinned text</p></main>');
+    assert.equal(findTarget({
+      ...target,
+      selectors: ['body > main > p:nth-of-type(1)', 'body > main > p:nth-of-type(2)'],
+    }), element('edited'));
+  });
+
+  it('recovers a shifted final cssPath rooted at an anchored ancestor', () => {
+    page('<main id="container"><p>Inserted sibling</p><p id="pinned">Pinned text</p></main>');
+    const pinned = element('pinned');
+    assert.equal(findTarget({ ...target, selectors: ['#container > p:nth-of-type(1)'] }), pinned);
   });
 
   it('still prefers the stored text among several selector matches', () => {

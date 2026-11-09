@@ -362,8 +362,9 @@
         </p>
         <p>
           If all saved selectors stop matching after a redeploy, pins look for the same tag and non-empty text.
-          Repeated text is resolved by the closest rectangle center. A selector that still matches keeps priority,
-          even if its text changed.
+          Repeated text is resolved by the closest rectangle center. The same text also recovers pins when the
+          final positional path shifts to a different element. If the old text is gone, the positional hit stays;
+          id and attribute selector hits always keep priority.
         </p>
       </section>
 

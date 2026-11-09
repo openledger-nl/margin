@@ -215,7 +215,9 @@ of flaws is in [demo/README.md](demo/README.md); `git checkout demo/` resets it.
 
 If all saved selectors stop matching after a redeploy, Browser Review looks for
 the same tag and non-empty text, choosing the closest rectangle center when text
-is repeated. A selector that still matches keeps priority, even if its text changed.
+is repeated. It also uses that text to recover when the final positional path
+shifts to a different element. If the old text is gone, the positional hit stays;
+id and attribute selector hits always keep priority.
 
 After the extension is reloaded or updated, a page that was already open shows
 "Margin Browser Review was reloaded" with a **Reload page** button: browsers don't put
