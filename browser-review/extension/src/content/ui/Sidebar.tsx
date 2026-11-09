@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { canDelete, KIND_LABELS, STATUS_LABELS, type Comment, type Status } from '@brm/shared';
-import { bridge } from '../bridge.ts';
+import { useHost, useSetting } from '../host.ts';
 import { describe } from '../targets.ts';
 import { replyDraft } from '../drafts.ts';
 import { useSendKey } from '../hooks.ts';
@@ -56,13 +56,10 @@ const COLLAPSED_KEY = 'threadsOverview';
  * ones the user toggled by hand. New threads follow the current default.
  */
 function useExpanded() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useSetting(COLLAPSED_KEY, (v) => v === true);
   const [toggled, setToggled] = useState<ReadonlySet<number>>(new Set());
   const collapsedRef = useRef(collapsed);
   collapsedRef.current = collapsed;
-  useEffect(() => {
-    void chrome.storage.local.get(COLLAPSED_KEY).then((r) => setCollapsed(r[COLLAPSED_KEY] === true));
-  }, []);
   // Toggled by hand means the opposite of the default.
   const isOpen = (id: number) => collapsed === toggled.has(id);
   const toggle = (id: number) =>
@@ -81,7 +78,6 @@ function useExpanded() {
   const setAll = (value: boolean) => {
     setCollapsed(value);
     setToggled(new Set());
-    void chrome.storage.local.set({ [COLLAPSED_KEY]: value });
   };
   return { collapsed, isOpen, toggle, show, setAll };
 }
@@ -100,12 +96,9 @@ const clampWidth = (w: number) => Math.round(Math.max(MIN_WIDTH, Math.min(w, inn
  * goes on the overlay root as --brm-side-w, so the toolbar and page composer move along.
  */
 function useSidebarWidth(ref: { current: HTMLElement | null }) {
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
-  useEffect(() => {
-    void chrome.storage.local.get(WIDTH_KEY).then((r) => {
-      if (typeof r[WIDTH_KEY] === 'number') setWidth(r[WIDTH_KEY]);
-    });
-  }, []);
+  const [width, save] = useSetting(WIDTH_KEY, (w) => (typeof w === 'number' ? w : DEFAULT_WIDTH));
+  /** While dragging: stored only when the drag ends. */
+  const [dragged, setDragged] = useState<number | null>(null);
   // Keep it inside the window when the window gets smaller.
   const [, rerender] = useState(0);
   useEffect(() => {
@@ -113,17 +106,13 @@ function useSidebarWidth(ref: { current: HTMLElement | null }) {
     addEventListener('resize', onResize);
     return () => removeEventListener('resize', onResize);
   }, []);
-  const shown = clampWidth(width);
+  const shown = clampWidth(dragged ?? width);
   useEffect(() => {
     const root = ref.current?.parentElement;
     root?.style.setProperty('--brm-side-w', `${shown}px`);
     return () => root?.style.removeProperty('--brm-side-w');
   }, [shown]);
 
-  const save = (w: number) => {
-    setWidth(w);
-    void chrome.storage.local.set({ [WIDTH_KEY]: w });
-  };
   const onPointerDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
@@ -133,13 +122,14 @@ function useSidebarWidth(ref: { current: HTMLElement | null }) {
     let w = shown;
     const move = (ev: PointerEvent) => {
       w = clampWidth(innerWidth - ev.clientX);
-      setWidth(w);
+      setDragged(w);
     };
     const up = () => {
       handle.classList.remove('is-dragging');
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', up);
       handle.removeEventListener('pointercancel', up);
+      setDragged(null);
       save(w);
     };
     handle.addEventListener('pointermove', move);
@@ -152,6 +142,7 @@ function useSidebarWidth(ref: { current: HTMLElement | null }) {
 const ORDER: Record<Status, number> = { review_ready: 0, in_progress: 1, open: 2, accepted: 3 };
 
 export function Sidebar({ comments, path, connected, focusId, docked, onClose, onHover, onGoTo, onOpenPage, onChanged }: Props) {
+  const host = useHost();
   const [scope, setScope] = useState<Scope>('page');
   const [filter, setFilter] = useState<Filter>('active');
   const expanded = useExpanded();
@@ -198,7 +189,7 @@ export function Sidebar({ comments, path, connected, focusId, docked, onClose, o
             Whole site
           </button>
         </div>
-        <button class="brm-icon-btn" title="Help" onClick={() => bridge.openHelp()}>
+        <button class="brm-icon-btn" title="Help" onClick={() => host.openHelp()}>
           ?
         </button>
         <button class="brm-icon-btn" title="Close (Alt+Shift+T)" onClick={onClose}>
@@ -234,7 +225,7 @@ export function Sidebar({ comments, path, connected, focusId, docked, onClose, o
             href="#"
             onClick={(e) => {
               e.preventDefault();
-              bridge.openHelp('setup');
+              host.openHelp('setup');
             }}
           >
             How to set it up
@@ -278,6 +269,7 @@ interface CardProps {
 }
 
 function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHover, onGoTo, onOpenPage, onChanged }: CardProps) {
+  const { comments: api } = useHost();
   const [reply, setReply] = useState(() => replyDraft.get(c.id));
 
   useEffect(() => replyDraft.set(c.id, reply), [c.id, reply]);
@@ -386,8 +378,8 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
               e.preventDefault();
               // Never accepts by keyboard: on a finished thread it reopens, with the text.
               if (busy || !reply.trim()) return;
-              if (c.status === 'review_ready' || c.status === 'accepted') void run(() => bridge.reopen(c.id, reply));
-              else void run(() => bridge.reply(c.id, reply));
+              if (c.status === 'review_ready' || c.status === 'accepted') void run(() => api.reopen(c.id, reply));
+              else void run(() => api.reply(c.id, reply));
             }}
           />
           {error && <p class="brm-error">{error}</p>}
@@ -421,7 +413,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
               <button
                 class="brm-btn"
                 disabled={busy}
-                onClick={() => void run(() => bridge.remove(c.id))}
+                onClick={() => void run(() => api.remove(c.id))}
                 title="Bring the element back and drop this task"
               >
                 Undo {c.kind === 'remove' ? 'removal' : 'edit'}
@@ -432,7 +424,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
                 class="brm-btn"
                 disabled={busy}
                 onClick={() => {
-                  if (confirm(`Delete comment #${c.id}?`)) void run(() => bridge.remove(c.id));
+                  if (confirm(`Delete comment #${c.id}?`)) void run(() => api.remove(c.id));
                 }}
               >
                 Delete
@@ -440,7 +432,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
             )}
             <span class="brm-spacer" />
             {(c.status === 'review_ready' || c.status === 'accepted') && (
-              <button class="brm-btn" disabled={busy} onClick={() => void run(() => bridge.reopen(c.id, reply))}>
+              <button class="brm-btn" disabled={busy} onClick={() => void run(() => api.reopen(c.id, reply))}>
                 Reopen
               </button>
             )}
@@ -448,13 +440,13 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
               <button
                 class="brm-btn"
                 disabled={busy || !reply.trim()}
-                onClick={() => void run(() => bridge.reply(c.id, reply))}
+                onClick={() => void run(() => api.reply(c.id, reply))}
               >
                 Send
               </button>
             )}
             {c.status === 'review_ready' && (
-              <button class="brm-btn brm-primary" disabled={busy} onClick={() => void run(() => bridge.accept(c.id))}>
+              <button class="brm-btn brm-primary" disabled={busy} onClick={() => void run(() => api.accept(c.id))}>
                 Accept solution
               </button>
             )}
@@ -466,6 +458,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
 }
 
 function Thumb({ comment }: { comment: Comment }) {
+  const host = useHost();
   const shot =
     comment.screenshots.find((s) => s.kind === 'element' && s.source === 'initial') ??
     comment.screenshots.find((s) => s.kind === 'page' && s.source === 'initial');
@@ -473,7 +466,7 @@ function Thumb({ comment }: { comment: Comment }) {
   useEffect(() => {
     if (!shot) return;
     let live = true;
-    void bridge.screenshot(shot.id).then((d) => live && setSrc(d));
+    void host.comments.screenshot(shot.id).then((d) => live && setSrc(d));
     return () => {
       live = false;
     };

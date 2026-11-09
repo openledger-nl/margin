@@ -6,7 +6,8 @@ import { render } from 'preact';
 import { useCallback, useEffect, useState } from 'preact/hooks';
 import { pageKey, type Comment } from '@brm/shared';
 import css from './content/styles.css';
-import { bridge } from './content/bridge.ts';
+import { createExtensionHost } from './content/extension-host.ts';
+import { HostContext, useHost } from './content/host.ts';
 import { Sidebar } from './content/ui/Sidebar.tsx';
 import {
   SITE_ACCESS_KEY,
@@ -82,6 +83,7 @@ function sendToTab<T>(tabId: number, req: TabRequest): Promise<T> {
 }
 
 function PanelApp({ windowId }: { windowId: number }) {
+  const host = useHost();
   const tab = useActiveTab(windowId);
   const settings = useSiteSettings();
   const allowed = tab !== null && settings !== null && isAllowed(tab.url, settings);
@@ -97,21 +99,21 @@ function PanelApp({ windowId }: { windowId: number }) {
       return;
     }
     try {
-      setComments(await bridge.listComments(origin));
+      setComments(await host.comments.list(origin));
       setLoaded(true);
     } catch {
       // background restarting: the next event loads again
     }
-  }, [origin]);
+  }, [host, origin]);
 
   // The port also tells the background this window's panel is open.
   useEffect(() => {
     void load();
-    return bridge.subscribe((ev) => {
+    return host.subscribe((ev) => {
       if (ev.type === 'status') setConnected(ev.connected);
       else if (ev.type === 'comments-changed' && ev.origin === origin) void load();
-    }, `brm-panel:${windowId}`);
-  }, [origin, load, windowId]);
+    });
+  }, [host, origin, load]);
 
   // A thread to show, from a pin or "Open thread" in the page.
   useEffect(() => {
@@ -146,7 +148,7 @@ function PanelApp({ windowId }: { windowId: number }) {
         <header class="brm-side-head">
           <strong>Review</strong>
           <span class="brm-spacer" />
-          <button class="brm-icon-btn" title="Help" onClick={() => bridge.openHelp()}>
+          <button class="brm-icon-btn" title="Help" onClick={() => host.openHelp()}>
             ?
           </button>
           <button class="brm-icon-btn" title="Close" onClick={close}>
@@ -185,6 +187,7 @@ function PanelApp({ windowId }: { windowId: number }) {
 
 /** Why there are no threads for this tab, and what to do about it. */
 function NotHere({ tab, settings }: { tab: ActiveTab | null; settings: SiteSettings | null }) {
+  const host = useHost();
   if (!settings) return null;
   if (tab && canTurnOn(tab.url, settings)) {
     return (
@@ -209,7 +212,7 @@ function NotHere({ tab, settings }: { tab: ActiveTab | null; settings: SiteSetti
         <strong>Strict mode is on</strong>
         <p>
           Margin Browser Review only runs on localhost, 127.0.0.1 and [::1]. To use it on other sites, change{' '}
-          <a href="#" onClick={(e) => (e.preventDefault(), bridge.openHelp('sites'))}>
+          <a href="#" onClick={(e) => (e.preventDefault(), host.openHelp('sites'))}>
             Where it works
           </a>{' '}
           on the help page.
@@ -230,5 +233,12 @@ style.textContent = css;
 document.head.append(style);
 const root = document.getElementById('root');
 void chrome.windows.getCurrent().then((w) => {
-  if (root && w.id !== undefined) render(<PanelApp windowId={w.id} />, root);
+  if (root && w.id !== undefined) {
+    render(
+      <HostContext.Provider value={createExtensionHost({ portName: `brm-panel:${w.id}` })}>
+        <PanelApp windowId={w.id} />
+      </HostContext.Provider>,
+      root,
+    );
+  }
 });

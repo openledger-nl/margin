@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { isPreviewActive, pageKey, type Comment, type Kind } from '@brm/shared';
-import type { GoToResponse, PanelState, PrepareCaptureResponse, TabRequest } from '../messages.ts';
-import { bridge } from './bridge.ts';
+import type { GoToResponse, PanelState, PrepareCaptureResponse } from '../messages.ts';
+import { useHost, useSetting } from './host.ts';
 import { enterCapture, nextFrames } from './capture.ts';
 import { useHref } from './hooks.ts';
 import { composerDraft, type ComposerDraft } from './drafts.ts';
 import type { Previews } from './previews.ts';
 import { findTarget } from './targets.ts';
-import { DEFAULT_HOLD_KEY, HOLD_KEY, HOLD_KEYS, toHoldKey, type HoldKey } from '../settings.ts';
+import { HOLD_KEY, HOLD_KEYS, toHoldKey } from '../settings.ts';
 import { Composer } from './ui/Composer.tsx';
 import { Picker } from './ui/Picker.tsx';
 import { Outline, Pins } from './ui/Pins.tsx';
@@ -26,14 +26,15 @@ const GOTO_KEY = 'brm-goto';
 const sidebarKey = (origin: string) => `sidebar:${origin}`;
 
 export function App({ previews }: { previews: Previews }) {
+  const host = useHost();
   const href = useHref();
   const { origin, path } = pageKey(href);
   const [comments, setComments] = useState<Comment[]>([]);
   /** A Claude Code session is connected. */
   const [connected, setConnected] = useState(false);
-  const [hidden, setHidden] = useState(false);
+  const [hidden, setHiddenSetting] = useSetting(hiddenKey(origin), (v) => v === true);
   const [mode, setMode] = useState<Mode>({ type: 'idle' });
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarStored] = useSetting(sidebarKey(origin), (v) => v === true);
   const [focusId, setFocusId] = useState<number | null>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
   const [flashId, setFlashId] = useState<number | null>(null);
@@ -47,22 +48,22 @@ export function App({ previews }: { previews: Previews }) {
 
   const load = useCallback(async () => {
     try {
-      setComments(await bridge.listComments(origin));
+      setComments(await host.comments.list(origin));
     } catch {
       // extension reloaded: keep what we have
     }
-  }, [origin]);
+  }, [host, origin]);
 
   useEffect(() => {
     void load();
-    return bridge.subscribe((ev) => {
+    return host.subscribe((ev) => {
       if (ev.type === 'status') {
         setConnected(ev.connected);
       } else if (ev.type === 'comments-changed' && ev.origin === origin) {
         void load();
       }
     });
-  }, [origin, load]);
+  }, [host, origin, load]);
 
   const pageComments = useMemo(() => comments.filter((c) => c.path === path), [comments, path]);
 
@@ -72,33 +73,18 @@ export function App({ previews }: { previews: Previews }) {
   }, [pageComments, previews]);
 
   useEffect(() => {
-    void bridge.panelState().then((p) => p && setPanel(p));
-  }, []);
+    if (!host.panel) setPanel({ supported: false, open: false });
+    else void host.panel.state().then((p) => p && setPanel(p));
+  }, [host]);
 
   // ---------- show / hide, per site ----------
 
-  useEffect(() => {
-    void chrome.storage.local.get([hiddenKey(origin), sidebarKey(origin)]).then((r) => {
-      setHidden(r[hiddenKey(origin)] === true);
-      setSidebarOpen(r[sidebarKey(origin)] === true);
-    });
-  }, [origin]);
-
-  const setSidebarStored = useCallback(
-    (value: boolean) => {
-      setSidebarOpen(value);
-      void chrome.storage.local.set({ [sidebarKey(origin)]: value });
-    },
-    [origin],
-  );
-
   const setHiddenStored = useCallback(
     (value: boolean) => {
-      setHidden(value);
+      setHiddenSetting(value);
       if (value) setMode({ type: 'idle' });
-      void chrome.storage.local.set({ [hiddenKey(origin)]: value });
     },
-    [origin],
+    [setHiddenSetting],
   );
 
   // ---------- messages from the background (toggle, live capture for Claude) ----------
@@ -115,7 +101,7 @@ export function App({ previews }: { previews: Previews }) {
       exitCapture.current = null;
       previews.suspend(false);
     };
-    const onMessage = (req: TabRequest, _sender: chrome.runtime.MessageSender, sendResponse: (r: unknown) => void) => {
+    return host.onRequest((req) => {
       if (req.type === 'toggle') {
         // Extension icon / Alt+Shift+R: show the overlay with the sidebar open.
         // When the sidebar is already showing, hide everything.
@@ -125,7 +111,7 @@ export function App({ previews }: { previews: Previews }) {
         } else {
           setHiddenStored(true);
         }
-        return false;
+        return;
       }
       if (req.type === 'command') {
         // Shortcuts also bring the overlay back when it is hidden.
@@ -137,31 +123,30 @@ export function App({ previews }: { previews: Previews }) {
         } else {
           setSidebarStored(hiddenRef.current ? true : !sidebarOpenRef.current);
         }
-        return false;
+        return;
       }
       if (req.type === 'capture-done') {
         finish();
-        return false;
+        return;
       }
       if (req.type === 'show') {
         setHiddenStored(!req.visible);
-        return false;
+        return;
       }
       if (req.type === 'panel-state') {
         setPanel({ supported: true, open: req.open });
         if (req.open) setHint(null);
-        return false;
+        return;
       }
       if (req.type === 'hover') {
         setHoverId(req.id);
-        return false;
+        return;
       }
       if (req.type === 'go-to') {
-        sendResponse({ note: goToRef.current(req.comment) } satisfies GoToResponse);
-        return false;
+        return { note: goToRef.current(req.comment) } satisfies GoToResponse;
       }
       if (req.type === 'prepare-capture') {
-        void (async (): Promise<PrepareCaptureResponse> => {
+        return (async (): Promise<PrepareCaptureResponse> => {
           finish();
           // Claude wants to see what the code does now, so switch previews off.
           previews.suspend(true);
@@ -182,28 +167,16 @@ export function App({ previews }: { previews: Previews }) {
           exitCapture.current = exit;
           setTimeout(finish, 10_000); // safety net
           return { rect, viewport: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio }, note };
-        })().then(sendResponse);
-        return true;
+        })();
       }
-      return false;
-    };
-    chrome.runtime.onMessage.addListener(onMessage);
-    return () => chrome.runtime.onMessage.removeListener(onMessage);
-  }, [previews, setHiddenStored, setSidebarStored]);
+    });
+  }, [host, previews, setHiddenStored, setSidebarStored]);
 
   // ---------- hold a key (Left Alt by default) to pick, release to stop ----------
 
   const modeRef = useRef(mode);
   modeRef.current = mode;
-  const [holdKey, setHoldKey] = useState<HoldKey>(DEFAULT_HOLD_KEY);
-  useEffect(() => {
-    void chrome.storage.local.get(HOLD_KEY).then((r) => setHoldKey(toHoldKey(r[HOLD_KEY])));
-    const onChange = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-      if (area === 'local' && HOLD_KEY in changes) setHoldKey(toHoldKey(changes[HOLD_KEY]?.newValue));
-    };
-    chrome.storage.onChanged.addListener(onChange);
-    return () => chrome.storage.onChanged.removeListener(onChange);
-  }, []);
+  const [holdKey] = useSetting(HOLD_KEY, toHoldKey, { live: true });
 
   // Where the mouse is, so a picker started from the keyboard highlights at once.
   const pointer = useRef<{ x: number; y: number } | null>(null);
@@ -258,14 +231,14 @@ export function App({ previews }: { previews: Previews }) {
   };
 
   const openPanel = (focus?: number) => {
-    void bridge.openPanel(focus).then((ok) => {
+    void host.panel?.open(focus).then((ok) => {
       if (!ok) showHint();
     });
   };
 
   const openThread = (id: number) => {
     if (usePanel) {
-      if (panel?.open) bridge.focusThread(id);
+      if (panel?.open) host.panel?.focus(id);
       else openPanel(id);
       return;
     }
@@ -277,7 +250,7 @@ export function App({ previews }: { previews: Previews }) {
 
   const toggleThreads = () => {
     if (!usePanel) setSidebarStored(!sidebarOpen);
-    else if (panel?.open) bridge.closePanel();
+    else if (panel?.open) host.panel?.close();
     else openPanel();
   };
 
@@ -354,7 +327,7 @@ export function App({ previews }: { previews: Previews }) {
     if (!c) return;
     sessionStorage.removeItem(GOTO_KEY);
     setHiddenStored(false);
-    if (usePanel) bridge.focusThread(id);
+    if (usePanel) host.panel?.focus(id);
     else openThread(id);
     let tries = 0;
     const attempt = () => {
@@ -436,7 +409,7 @@ export function App({ previews }: { previews: Previews }) {
         onPageComment={() => setMode({ type: 'compose', el: null, kind: 'comment' })}
         onToggleSidebar={toggleThreads}
         onHide={() => setHiddenStored(true)}
-        onHelp={() => bridge.openHelp()}
+        onHelp={() => host.openHelp()}
       />
     </>
   );

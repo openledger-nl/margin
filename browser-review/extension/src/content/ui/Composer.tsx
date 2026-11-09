@@ -1,7 +1,7 @@
 // The popover to write a comment, remove an element, or edit it.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { pageKey, type Change, type Comment, type Kind, type TextChange } from '@brm/shared';
-import { bridge } from '../bridge.ts';
+import { useHost, useSetting } from '../host.ts';
 import { withCapture } from '../capture.ts';
 import { textNodesOf, type Previews } from '../previews.ts';
 import { buildTarget, describe, probeReact, textOf } from '../targets.ts';
@@ -31,6 +31,7 @@ const MIN_HEIGHT = 180;
 const OPEN_THREAD_KEY = 'openThreadAfterSend';
 
 export function Composer({ el, initialKind, draft, notice, previews, onCreated, onCancel }: Props) {
+  const host = useHost();
   const [kind, setKind] = useState<Kind>(el ? (draft?.kind ?? initialKind) : 'comment');
   const [body, setBody] = useState(draft?.body ?? '');
   const textNodes = useMemo(() => (el ? textNodesOf(el) : []), [el]);
@@ -43,14 +44,7 @@ export function Composer({ el, initialKind, draft, notice, previews, onCreated, 
   const [error, setError] = useState<string | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const sendKey = useSendKey();
-  const [openThread, setOpenThread] = useState(false);
-  useEffect(() => {
-    void chrome.storage.local.get(OPEN_THREAD_KEY).then((r) => setOpenThread(r[OPEN_THREAD_KEY] === true));
-  }, []);
-  const toggleOpenThread = (value: boolean) => {
-    setOpenThread(value);
-    void chrome.storage.local.set({ [OPEN_THREAD_KEY]: value });
-  };
+  const [openThread, toggleOpenThread] = useSetting(OPEN_THREAD_KEY, (v) => v === true);
 
   const textChanges = useMemo<TextChange[]>(
     () =>
@@ -111,9 +105,9 @@ export function Composer({ el, initialKind, draft, notice, previews, onCreated, 
       // Screenshot and target info from the original, unchanged element.
       previews.clearDraft();
       const target = el ? buildTarget(el) : null;
-      const screenshots = await withCapture(el, (rect) => bridge.capture(rect));
+      const screenshots = await withCapture(el, (rect) => host.capture(rect));
       if (el && change) previews.setDraft(el, change);
-      const created = await bridge.createComment({
+      const created = await host.comments.create({
         kind,
         url: location.href,
         title: document.title,
@@ -143,15 +137,11 @@ export function Composer({ el, initialKind, draft, notice, previews, onCreated, 
   // ---------- size: the user can drag it taller (or shorter); we remember that ----------
 
   const cardRef = useRef<HTMLDivElement>(null);
-  const [userHeight, setUserHeight] = useState<number | null>(null);
+  const [userHeight, setUserHeight] = useSetting<number | null>(HEIGHT_KEY, (h) =>
+    typeof h === 'number' && h >= MIN_HEIGHT ? h : null,
+  );
   const userHeightRef = useRef(userHeight);
   userHeightRef.current = userHeight;
-  useEffect(() => {
-    void chrome.storage.local.get(HEIGHT_KEY).then((r) => {
-      const h = r[HEIGHT_KEY];
-      if (typeof h === 'number' && h >= MIN_HEIGHT) setUserHeight(h);
-    });
-  }, []);
   useEffect(() => {
     const card = cardRef.current;
     if (!card) return;
@@ -162,17 +152,14 @@ export function Composer({ el, initialKind, draft, notice, previews, onCreated, 
       if (!dragged || Math.abs(dragged - (userHeightRef.current ?? 0)) < 1) return;
       userHeightRef.current = dragged;
       clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        setUserHeight(dragged);
-        void chrome.storage.local.set({ [HEIGHT_KEY]: Math.round(dragged) });
-      }, 200);
+      timer = window.setTimeout(() => setUserHeight(Math.round(dragged)), 200);
     });
     ro.observe(card);
     return () => {
       ro.disconnect();
       clearTimeout(timer);
     };
-  }, []);
+  }, [setUserHeight]);
   // Height used to decide where it goes. Measured once, then fixed, so resizing
   // only moves the bottom edge (the handle stays under the mouse).
   const placeHeight = useRef<number | null>(null);

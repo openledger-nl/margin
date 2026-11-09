@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Rect } from '@brm/shared';
-import { DEFAULT_SEND_KEY, SEND_KEY, toSendKey, type SendKey } from '../settings.ts';
+import { SEND_KEY, toSendKey, type SendKey } from '../settings.ts';
+import { useSetting } from './host.ts';
 
 function same(a: Rect | null, b: Rect | null): boolean {
   if (!a || !b) return a === b;
@@ -71,17 +72,5 @@ export function useHref(): string {
 
 /** The send key setting, live: a change on the help page applies at once. */
 export function useSendKey(): SendKey {
-  const [key, setKey] = useState<SendKey>(DEFAULT_SEND_KEY);
-  useEffect(() => {
-    void chrome.storage.local
-      .get(SEND_KEY)
-      .then((r) => setKey(toSendKey(r[SEND_KEY])))
-      .catch(() => {});
-    const onChange = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
-      if (area === 'local' && SEND_KEY in changes) setKey(toSendKey(changes[SEND_KEY]?.newValue));
-    };
-    chrome.storage.onChanged.addListener(onChange);
-    return () => chrome.storage.onChanged.removeListener(onChange);
-  }, []);
-  return key;
+  return useSetting(SEND_KEY, toSendKey, { live: true })[0];
 }
