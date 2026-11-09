@@ -22,7 +22,7 @@
     "test": "node --test \"scripts/**/*.test.ts\" && pnpm -r test",
     "version:bump": "node scripts/version.ts bump",
     "version:sync": "node scripts/version.ts sync",
-    "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true"
+    "prepare": "node scripts/hooks.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
