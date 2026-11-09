@@ -360,6 +360,11 @@
           Every comment gets a numbered pin, a screenshot, and the element's selectors, HTML and React component, so
           your agent knows exactly what you mean. What you type survives a reload of your app.
         </p>
+        <p>
+          If all saved selectors stop matching after a redeploy, pins look for the same tag and non-empty text.
+          Repeated text is resolved by the closest rectangle center. A selector that still matches keeps priority,
+          even if its text changed.
+        </p>
       </section>
 
       <section id="claude">

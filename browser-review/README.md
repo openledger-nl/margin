@@ -213,6 +213,10 @@ of flaws is in [demo/README.md](demo/README.md); `git checkout demo/` resets it.
 | Send a comment or reply | Enter (Shift+Enter for a new line). Prefer Enter for new lines? On the help page, set **Send** to Ctrl+Enter |
 | Cancel | Esc |
 
+If all saved selectors stop matching after a redeploy, Browser Review looks for
+the same tag and non-empty text, choosing the closest rectangle center when text
+is repeated. A selector that still matches keeps priority, even if its text changed.
+
 After the extension is reloaded or updated, a page that was already open shows
 "Margin Browser Review was reloaded" with a **Reload page** button: browsers don't put
 the new version into open tabs by themselves.

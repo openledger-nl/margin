@@ -145,6 +145,8 @@ export function buildTarget(el: Element): TargetInfo {
 
 /** Finds the element of a stored target. With several matches, the one with the same text wins. */
 export function findTarget(target: TargetInfo): Element | null {
+  // Even positional selector hits stay authoritative when text changes: an intentional
+  // edit must not move a pin to another element that still has the old text.
   for (const sel of target.selectors) {
     let matches: Element[];
     try {
@@ -155,7 +157,22 @@ export function findTarget(target: TargetInfo): Element | null {
     if (matches.length === 1) return matches[0] ?? null;
     if (matches.length > 1) return matches.find((m) => textOf(m) === target.text) ?? matches[0] ?? null;
   }
-  return null;
+  if (!target.text) return null;
+  let closest: Element | null = null;
+  let closestDistance = Infinity;
+  const x = target.rect.x + target.rect.width / 2;
+  const y = target.rect.y + target.rect.height / 2;
+  for (const el of document.getElementsByTagName(target.tag)) {
+    if (isOurs(el) || textOf(el) !== target.text) continue;
+    const rect = el.getBoundingClientRect();
+    // Compare rectangle centers; equal distances keep document order.
+    const distance = (rect.x + rect.width / 2 - x) ** 2 + (rect.y + rect.height / 2 - y) ** 2;
+    if (distance < closestDistance) {
+      closest = el;
+      closestDistance = distance;
+    }
+  }
+  return closest;
 }
 
 /** Short label like `button.save "Opslaan"` for the picker and sidebar. */
