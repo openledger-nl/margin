@@ -10,8 +10,9 @@ Margin is a set of browser extensions for working on the web with less in the wa
 | | |
 |---|---|
 | **[Browser Review](browser/)** | Comment on, remove and edit elements of your dev app in the browser, and let Claude Code pick the comments up over MCP and fix them. |
+| **[Margin for GitHub](github/)** | A GitHub homepage with your repositories, your organizations and where you pushed last, and switches to declutter the rest of GitHub. |
 
-It runs in Chrome (and Brave, Edge) and Firefox. Its folder has its own README
+Both run in Chrome (and Brave, Edge) and Firefox. Each folder has its own README
 with how to install, use and build it.
 
-The logo, the extension icons and the wordmark are in [brand/](brand/).
+The logo, the icons both extensions use and the wordmark are in [brand/](brand/).

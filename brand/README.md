@@ -10,8 +10,8 @@ prompt `#4CC38A`, code lines `#B4BACB`.
 | `icons/16.png` … `icons/128.png` | Extension icons. 16 px shows only the M and the screen, 32 px adds the prompt, 48 px and up are the full mark |
 | `margin-wordmark-on-light.svg`, `-on-dark.svg` (and `@2x.png`) | "Margin_": the mark as the M, "argin" in Inter SemiBold, the green cursor. Same metrics as Ledger's wordmark |
 
-Every extension in this repo copies `icons/` into its build (`browser/extension/build.ts`),
-so a new icon goes here once.
+Every extension in this repo copies `icons/` into its build (`browser/extension/build.ts`,
+`github/build.ts`), so a new icon goes here once.
 
 The designs live in Penpot (file "Ledger", page "Margin · Logos"). The letters
 in the wordmark are outlines, so the SVG needs no font installed.

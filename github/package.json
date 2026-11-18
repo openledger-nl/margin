@@ -1,0 +1,30 @@
+{
+  "name": "margin-github",
+  "version": "0.4.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@12.9.1",
+  "scripts": {
+    "build": "node build.ts && node build.ts --firefox",
+    "build:chrome": "node build.ts",
+    "build:firefox": "node build.ts --firefox",
+    "dev": "node build.ts --watch",
+    "dev:firefox": "node build.ts --watch --firefox",
+    "package": "node build.ts --zip && node build.ts --zip --firefox",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc -p . && tsc -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "preact": "^11.1.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.7",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}

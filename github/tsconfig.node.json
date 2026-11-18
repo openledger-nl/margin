@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "types": ["node", "chrome"], "lib": ["es2024", "dom"] },
+  "include": ["build.ts", "zip.ts", "src/**/*.test.ts"]
+}

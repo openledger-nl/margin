@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Margin - Declutter GitHub homepage</title>
+    <link rel="stylesheet" href="home.css" />
+    <style>
+      /* GitHub's colors, which home.css uses, for outside github.com. */
+      :root {
+        color-scheme: light dark;
+        --fgColor-default: #1f2328;
+        --fgColor-muted: #59636e;
+        --fgColor-accent: #0969da;
+        --fgColor-danger: #d1242f;
+        --fgColor-success: #1a7f37;
+        --bgColor-default: #ffffff;
+        --bgColor-muted: #f6f8fa;
+        --borderColor-default: #d1d9e0;
+        --borderColor-muted: #d1d9e0b3;
+        --button-primary-bgColor-rest: #1f883d;
+        --button-primary-fgColor-rest: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fgColor-default: #f0f6fc;
+          --fgColor-muted: #9198a1;
+          --fgColor-accent: #4493f8;
+          --fgColor-danger: #f85149;
+          --fgColor-success: #3fb950;
+          --bgColor-default: #0d1117;
+          --bgColor-muted: #151b23;
+          --borderColor-default: #3d444d;
+          --borderColor-muted: #3d444db3;
+          --button-primary-bgColor-rest: #238636;
+        }
+      }
+      body {
+        width: 380px;
+        margin: 0;
+        background: var(--bgColor-default);
+        color: var(--fgColor-default);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+      }
+      a {
+        color: var(--fgColor-accent);
+      }
+      main {
+        padding: 12px 16px 8px;
+      }
+      h1 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px;
+        margin: 0;
+      }
+      .lead {
+        color: var(--fgColor-muted);
+        font-size: 12px;
+        margin: 2px 0 0;
+      }
+      .hb-set-section {
+        padding: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1><img src="icons/32.png" width="20" height="20" alt="" />Margin</h1>
+      <p class="lead">Declutter GitHub homepage. Changes apply right away to your open GitHub tabs.</p>
+      <div id="app"></div>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
