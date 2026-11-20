@@ -16,7 +16,7 @@ extension/   MV3 extension: background worker owns the data (store.ts over Index
              build.ts makes dist/ (Chromium) and, with --firefox, dist-firefox/
 demo/        Vite + React demo app with flaws on purpose (`pnpm demo`); not released
 scripts/     version.ts: Conventional Commit checks and version bumps
-.githooks/   commit-msg and post-commit hooks (enabled by `pnpm install`)
+.githooks/   commit-msg hook: checks the Conventional Commit message
 ```
 
 How it fits together: Claude Code starts `npx browser-review-mcp` per session.
@@ -37,9 +37,10 @@ pnpm publish:mcp     # publish browser-review-mcp to npm (only when the user ask
 After a change: run `pnpm typecheck`, `pnpm test` and `pnpm build`.
 
 CI (`.github/workflows/ci.yml` at the repo root) runs the same on every push and pull request, and
-on main creates GitHub release `v<version>` (chrome zip, firefox zip, MCP tarball)
-when the version changed. Release notes come from `scripts/release-notes.ts`, so
-the commit summaries are what users read: write them for users.
+on main versions and releases every Margin extension together (`scripts/release.ts` at the
+repo root): one GitHub release `Margin x.y.z` with the installers for both extensions. The
+release notes list the `feat` and `fix` commit summaries, so those are what users read:
+write them for users. The MCP server is published to npm by hand, not by CI.
 When a change is visible to the user (a button, shortcut, behaviour, setup), update
 the README, and the help page (`extension/static/help.html`) when it affects how to
 set up or use it. The help page is what users read first.
@@ -102,32 +103,22 @@ docs: explain the localhost-only notice
 One logical change per commit. If a change has both a feature and a fix, the
 highest bump wins, so a `feat` commit may include the fixes it needed.
 
-## Versioning: Semantic Versioning, automatic
+## Versioning: Semantic Versioning, automatic, in CI
 
-The version follows [SemVer](https://semver.org/): `MAJOR.MINOR.PATCH`.
+All Margin extensions share one version (`MAJOR.MINOR.PATCH`, [SemVer](https://semver.org/)), and CI
+sets it: on every push to `main`, `scripts/release.ts` (repo root) reads the Conventional Commits since
+the last `vX.Y.Z` tag and takes the largest bump:
 
-- The root `package.json` `"version"` is the single source of truth.
-- It is copied into `shared/`, `server/` and `extension/` `package.json` and
-  `extension/static/manifest.json`. The MCP server reads its version from its
-  `package.json` at runtime, the extension from its manifest.
-- **Never edit version numbers by hand.** The `post-commit` hook reads the commit
-  message, bumps the version (table above), syncs all files and amends the bump into
-  the same commit. It prints `Version x.y.z (level)` when it does.
-- It does not bump again when the commit already changes the version (for example
-  `git commit --amend`), nor during rebase, cherry-pick or merge.
-- If it says the version files have uncommitted changes, commit or stash those
-  first, then run the command it prints.
+| Commit | Bump |
+|---|---|
+| `!` after the type, or a `BREAKING CHANGE:` footer | major |
+| `feat` | minor |
+| `fix`, `perf` | patch |
+| anything else (`docs`, `ci`, `chore`, `refactor`, `test`, ...) | none: no release |
 
-By hand, when really needed:
+It writes the version into every `package.json` and `manifest.json` of both extensions, commits
+`chore(release): vX.Y.Z`, tags it and publishes the release. So:
 
-```sh
-pnpm version:bump patch|minor|major   # bump and sync
-pnpm version:sync                     # copy the root version into every file
-```
-
-Do not use `git commit --no-verify` unless the user asks for it: it skips the
-message check (the version bump still runs).
-
-The hooks are enabled by `pnpm install` (the `prepare` script sets
-`core.hooksPath` to `.githooks`). In a fresh clone without install, run
-`git config core.hooksPath .githooks`.
+- **Never edit version numbers by hand**, and don't make `chore(release)` commits or `v*` tags:
+  CI owns them. Pull `main` before new work, it has CI's release commit on top.
+- The commit type is the only thing you choose: pick it for what the user gets.

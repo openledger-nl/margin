@@ -1,16 +1,17 @@
 # Releasing: signing and stores
 
-CI (`.github/workflows/ci.yml` at the repo root) releases by itself on `main` when the version
-changes (a `feat:` or `fix:` commit bumps it). It always makes the GitHub release.
-The three jobs below join in once their keys are in GitHub. Without the keys they
-are skipped with a notice in the run, nothing fails.
+CI (`.github/workflows/ci.yml` at the repo root) releases every Margin extension by itself on
+`main` when a `feat:` or `fix:` commit lands (see "Versioning" in CLAUDE.md): one GitHub release
+`Margin x.y.z` with the installers for both extensions. Signing for Firefox and the Chrome Web
+Store join in once their keys are in GitHub; without the keys they are skipped with a notice.
+The MCP server goes to npm by hand (below), not from CI.
 
 Where to put the keys: GitHub repo, **Settings**, **Secrets and variables**,
 **Actions**. "Secret" means the **Secrets** tab, "variable" the **Variables** tab.
 
 | Target | What users get | You need | One-time by hand |
 |---|---|---|---|
-| npm | `npx -y browser-review-mcp@latest` | npm account | publish the first version |
+| npm (by hand) | `npx -y browser-review-mcp@latest` | npm account | every version: `pnpm publish:mcp` |
 | Firefox | signed `.xpi` on the GitHub release, installs permanently | addons.mozilla.org account | nothing |
 | Chrome Web Store | install from the store (Chrome, Brave, Edge) | Chrome Web Store developer account ($5 once), Google Cloud project | create the store listing |
 
@@ -28,32 +29,15 @@ Where to put the keys: GitHub repo, **Settings**, **Secrets and variables**,
 - **npm** packages are not signed by you, but CI publishes with **provenance**:
   npm shows that the package was built from this repo by this workflow.
 
-## npm
+## npm (by hand)
 
-1. Make an account on [npmjs.com](https://www.npmjs.com/signup) and turn on 2FA
-   (Account, Two-Factor Authentication).
-2. Publish the first version by hand. npm can't set up trusted publishing for a
-   package that does not exist yet. With the work committed:
+The MCP server is not published by CI. After a release, from `browser-review/` on the release
+commit (`git pull`, so the version is CI's):
 
-   ```sh
-   npm login
-   pnpm publish:mcp
-   ```
-
-3. Let CI publish from now on, without a token: on npmjs.com open the package,
-   **Settings**, **Trusted Publisher**, **GitHub Actions**, and fill in:
-   - Organization or user: `openledger-nl`
-   - Repository: `margin`
-   - Workflow filename: `ci.yml`
-   - Environment: leave empty
-
-   Then, under **Publishing access**, choose "Require two-factor authentication
-   and disallow tokens" so only CI and you (with 2FA) can publish.
-
-Instead of 2 and 3: a granular access token (npmjs.com, Access Tokens,
-"Generate New Token", Granular, read and write for `browser-review-mcp` or for
-all packages if it doesn't exist yet) as secret **`NPM_TOKEN`**. That also works
-for the very first publish, but a token can leak; trusted publishing can't.
+```sh
+npm login
+pnpm publish:mcp
+```
 
 ## Firefox (Mozilla signing)
 
@@ -65,14 +49,15 @@ for the very first publish, but a token can leak; trusted publishing can't.
    - **`AMO_JWT_ISSUER`**: the "JWT issuer" (looks like `user:12345:67`)
    - **`AMO_JWT_SECRET`**: the "JWT secret"
 
-Each release then gets `browser-review-<version>-firefox.xpi`. CI sends the
-repo's source along (`git archive`), because the add-on is bundled and Mozilla
-may review it against the source. Build steps for a reviewer: `pnpm install`,
-`pnpm package` (Node 26, pnpm).
+Each release then gets `margin-browser-review-firefox.xpi` and `margin-github-firefox.xpi`
+instead of the unsigned Firefox zips. CI sends the repo's source along (`git archive`),
+because the add-ons are bundled and Mozilla may review them against the source. Build steps
+for a reviewer: in `browser-review/` or `github/`, `pnpm install`, `pnpm package` (Node 26, pnpm).
 
 Notes:
-- The add-on ID is `browser-review@andor00` (`extension/build.ts`). It is fixed
-  on addons.mozilla.org after the first upload.
+- The add-on IDs are `browser-review@andor00` (`browser-review/extension/build.ts`) and
+  `margin-github@andor00` (`github/build.ts`). They are fixed on addons.mozilla.org after
+  the first upload.
 - Every upload needs a higher version. CI only signs new releases, so that holds.
 - Self-distributed add-ons don't update by themselves: users install the new
   `.xpi` from the release. (Automatic updates need an `update_url`; can be added.)
@@ -129,5 +114,7 @@ review passes (usually within a day for updates).
 ## Checking a release
 
 The run page on GitHub (Actions, CI) shows each job. Skipped stores show a
-notice saying which keys are missing. The release page lists the files:
-`-chrome.zip`, `-firefox.zip`, `-firefox.xpi` (when signed) and the MCP `.tgz`.
+notice saying which keys are missing. The release page lists the files, the same
+names every release: `margin-github-chrome.zip`, `margin-browser-review-chrome.zip`
+and `margin-github-firefox.xpi`, `margin-browser-review-firefox.xpi` (or `-firefox.zip`
+while unsigned). `releases/latest/download/<file>` always gives the newest.

@@ -1,22 +1,20 @@
-# CI for every extension in this repo. Each one builds, tests and packages on every push and pull
-# request. On main, when an extension's version has no release yet, it publishes a GitHub release for
-# that version, refreshes the extension's rolling "-latest" release (fixed file names, for the website)
-# and signs or publishes it wherever the keys are set (see browser-review/docs/releasing.md):
+# CI for every Margin extension. On every push and pull request it builds, tests and packages
+# Margin Browser Review (browser-review/) and Margin for GitHub (github/).
 #
-#   Margin Browser Review (browser-review/)       version: browser-review/package.json
-#     release v<version>          browser-review-<version>-chrome.zip, -firefox.zip, -firefox.xpi (signed),
-#                                 browser-review-mcp-<version>.tgz; also npm and the Chrome Web Store
-#     release browser-review-latest   browser-review-chrome.zip, -firefox.zip, -firefox.xpi
+# Releases are automatic, one for everything (scripts/release.ts): on a push to main, the Conventional
+# Commits since the last vX.Y.Z tag decide the next version (feat -> minor, fix/perf -> patch, "!" ->
+# major; docs, ci, chore and the like release nothing). CI writes that version into both extensions,
+# commits "chore(release): vX.Y.Z", tags it, builds that commit and publishes the release "Margin X.Y.Z"
+# (the repo's Latest) with the same file names every time, so releases/latest/download/<file> always
+# works:
+#   margin-github-firefox.xpi           margin-browser-review-firefox.xpi   signed by Mozilla, install in one click
+#   margin-github-chrome.zip            margin-browser-review-chrome.zip    Chrome, Brave, Edge: Load unpacked
+# The MCP server (browser-review-mcp) is built and tested here but published to npm by hand.
 #
-#   Margin for GitHub (github/)                   version: github/package.json (raise it by hand)
-#     release github-v<version>   margin-github-<version>-chrome.zip, -firefox.zip, -firefox.xpi (signed)
-#     release margin-github-latest    margin-github-chrome.zip, -firefox.zip, -firefox.xpi
-#
-# Margin Browser Review keeps the repo's "Latest" release; the others are never marked latest.
-# Secrets, all optional (a job without its keys is skipped with a notice):
-#   AMO_JWT_ISSUER, AMO_JWT_SECRET   Mozilla signing: the .xpi files, which install in Firefox in one click
-#   NPM_TOKEN                        npm, when trusted publishing isn't set up
-#   CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN (+ variables CWS_PUBLISHER_ID, CWS_EXTENSION_ID)
+# Secrets, all optional (whatever has no keys is skipped with a notice):
+#   AMO_JWT_ISSUER, AMO_JWT_SECRET   Mozilla signing. Without them the Firefox files are unsigned zips.
+#   CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN + variables CWS_PUBLISHER_ID,
+#     CWS_EXTENSION_ID (Margin Browser Review), CWS_GITHUB_EXTENSION_ID (Margin for GitHub)
 #   NETLIFY_BUILD_HOOK               rebuilds the website after a release, so it offers the new files
 name: CI
 
@@ -24,7 +22,13 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch:
+  workflow_dispatch: # "Run workflow" on main can force a release
+    inputs:
+      release:
+        description: Release at least this much, even without feat or fix commits
+        type: choice
+        options: [none, patch, minor, major]
+        default: none
 
 permissions:
   contents: read
@@ -34,21 +38,74 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # ======================================================================================
-  # Margin Browser Review (browser-review/)
-  # ======================================================================================
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # the release commit and tag
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      version: ${{ steps.plan.outputs.version }}
+      ref: ${{ steps.push.outputs.ref || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # tags and history
+          # On main: the branch as it is now, including an earlier run's release commit.
+          ref: ${{ github.event_name != 'pull_request' && github.ref || '' }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          package-manager-cache: false
+
+      - name: Test the release script
+        run: node --test scripts/release.test.ts
+
+      - name: Plan the version
+        id: plan
+        env:
+          FORCE_LEVEL: ${{ inputs.release }}
+        run: |
+          plan=$(node scripts/release.ts plan)
+          echo "$plan"
+          level=$(echo "$plan" | jq -r .level)
+          echo "version=$(echo "$plan" | jq -r .version)" >> "$GITHUB_OUTPUT"
+          if [ "$level" != none ] && [ "$GITHUB_EVENT_NAME" != pull_request ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "No release: level $level on $GITHUB_EVENT_NAME $GITHUB_REF."
+          fi
+
+      - name: Commit and tag v${{ steps.plan.outputs.version }}
+        id: push
+        if: steps.plan.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          node scripts/release.ts apply "$VERSION"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "chore(release): v$VERSION"
+          git tag "v$VERSION"
+          # A push with the workflow's token starts no new run, so this doesn't loop.
+          git push origin HEAD:refs/heads/main "refs/tags/v$VERSION"
+          echo "ref=v$VERSION" >> "$GITHUB_OUTPUT"
 
   browser-review:
-    name: Browser Review - test and package
+    name: Margin Browser Review - test and package
+    needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: browser-review
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.ref }}
 
       - uses: pnpm/action-setup@v6
         with:
@@ -72,235 +129,34 @@ jobs:
       - name: Package the extension (Chrome/Brave/Edge and Firefox)
         run: pnpm package
 
-      - name: Package the MCP server
+      - name: Build and test the MCP server (published to npm by hand)
         run: |
           pnpm --dir server build
           BRM_CLI=dist/cli.js node --test server/src/cli.test.ts
-          pnpm --dir server pack --pack-destination ../release
 
       - name: Check the Firefox build with Mozilla's linter
         run: npx --yes web-ext lint --source-dir extension/dist-firefox --output text
 
-      - name: Read the version
-        id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: List the packages
-        run: ls -l release
+      - run: ls -l release
 
       - uses: actions/upload-artifact@v7
         with:
-          name: browser-review-${{ steps.version.outputs.version }}
+          name: browser-review
           path: browser-review/release/*
           if-no-files-found: error
 
-  browser-review-release:
-    name: Browser Review - GitHub release
-    needs: browser-review
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    defaults:
-      run:
-        working-directory: browser-review
-    outputs:
-      created: ${{ steps.release.outputs.created }}
-    env:
-      GH_TOKEN: ${{ github.token }}
-      VERSION: ${{ needs.browser-review.outputs.version }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # tags and history for the release notes
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: browser-review/.nvmrc
-          package-manager-cache: false # no pnpm in this job
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: browser-review-${{ needs.browser-review.outputs.version }}
-          path: browser-review/release
-
-      - name: Create release v${{ needs.browser-review.outputs.version }} (once per version)
-        id: release
-        # Safe to rerun: each step checks what is already there, and GitHub API calls are retried.
-        run: |
-          . ../.github/scripts/retry.sh
-          tag="v$VERSION"
-          # "none" (new version), "true" (draft left by a failed run) or "false" (released).
-          state=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null || echo none)
-          if [ "$state" = "false" ]; then
-            echo "Release $tag already exists: the version did not change, nothing to publish."
-            echo "created=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          prev=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
-          node scripts/release-notes.ts "$VERSION" "$prev" > notes.md
-          cat notes.md
-          make_draft() {
-            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --draft \
-              --target "$GITHUB_SHA" --title "Margin Browser Review $VERSION" --notes-file notes.md
-          }
-          retry make_draft
-          retry gh release upload "$tag" release/* --clobber
-          retry gh release edit "$tag" --draft=false --latest
-          echo "created=true" >> "$GITHUB_OUTPUT"
-
-      - name: Refresh browser-review-latest
-        if: steps.release.outputs.created == 'true'
-        run: |
-          ../.github/scripts/latest.sh browser-review-latest "Margin Browser Review" "$VERSION" \
-            "release/browser-review-$VERSION-chrome.zip=browser-review-chrome.zip" \
-            "release/browser-review-$VERSION-firefox.zip=browser-review-firefox.zip"
-
-      - name: Rebuild the website
-        if: steps.release.outputs.created == 'true'
-        env:
-          NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
-        run: ../.github/scripts/netlify.sh
-
-  browser-review-firefox:
-    name: Browser Review - sign for Firefox
-    needs: [browser-review, browser-review-release]
-    if: needs.browser-review-release.outputs.created == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45 # Mozilla's automatic review usually takes minutes
-    permissions:
-      contents: write # attach the signed .xpi to the releases
-    env:
-      VERSION: ${{ needs.browser-review.outputs.version }}
-      WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
-      WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
-      NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - name: Skip without Mozilla API keys
-        if: env.WEB_EXT_API_KEY == '' || env.WEB_EXT_API_SECRET == ''
-        run: echo "::notice::Firefox signing skipped. Add the AMO_JWT_ISSUER and AMO_JWT_SECRET secrets (browser-review/docs/releasing.md)."
-
-      - uses: actions/checkout@v7
-        if: env.WEB_EXT_API_KEY != ''
-
-      - uses: actions/setup-node@v7
-        if: env.WEB_EXT_API_KEY != ''
-        with:
-          node-version-file: browser-review/.nvmrc
-          package-manager-cache: false
-
-      - uses: actions/download-artifact@v8
-        if: env.WEB_EXT_API_KEY != ''
-        with:
-          name: browser-review-${{ needs.browser-review.outputs.version }}
-          path: release
-
-      - name: Sign and attach to the releases
-        if: env.WEB_EXT_API_KEY != ''
-        run: |
-          # Mozilla reviews bundled code against its source: send the extension's source at this commit.
-          git archive --format=zip -o source.zip HEAD browser-review brand
-          .github/scripts/sign-firefox.sh "release/browser-review-$VERSION-firefox.zip" "browser-review-$VERSION-firefox.xpi"
-          gh release upload "v$VERSION" "browser-review-$VERSION-firefox.xpi" --clobber
-          cp "browser-review-$VERSION-firefox.xpi" browser-review-firefox.xpi
-          gh release upload browser-review-latest browser-review-firefox.xpi --clobber
-          .github/scripts/netlify.sh
-
-  browser-review-npm:
-    name: Browser Review - publish browser-review-mcp to npm
-    needs: [browser-review, browser-review-release]
-    if: needs.browser-review-release.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      id-token: write # npm trusted publishing and provenance
-    env:
-      VERSION: ${{ needs.browser-review.outputs.version }}
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-    steps:
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          package-manager-cache: false
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: browser-review-${{ needs.browser-review.outputs.version }}
-          path: release
-
-      - name: Publish (once per version)
-        run: |
-          if npm view "browser-review-mcp@$VERSION" version >/dev/null 2>&1; then
-            echo "browser-review-mcp@$VERSION is already on npm."
-            exit 0
-          fi
-          if [ -n "$NPM_TOKEN" ]; then
-            npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          elif ! npm view browser-review-mcp name >/dev/null 2>&1; then
-            echo "::notice::npm publish skipped. Publish the first version by hand, then set up trusted publishing (browser-review/docs/releasing.md)."
-            exit 0
-          fi
-          npm install -g npm@latest # trusted publishing needs npm 11.5.1 or newer
-          npm publish "./release/browser-review-mcp-$VERSION.tgz" --access public --provenance # "./": npm reads "release/..." as a GitHub repo
-
-  browser-review-chrome-web-store:
-    name: Browser Review - upload to the Chrome Web Store
-    needs: [browser-review, browser-review-release]
-    if: needs.browser-review-release.outputs.created == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      VERSION: ${{ needs.browser-review.outputs.version }}
-      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
-      CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
-      CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-      CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
-      CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
-    steps:
-      - name: Skip without Chrome Web Store credentials
-        if: env.CWS_REFRESH_TOKEN == '' || env.CWS_EXTENSION_ID == ''
-        run: echo "::notice::Chrome Web Store upload skipped. Add the CWS_* secrets and variables (browser-review/docs/releasing.md)."
-
-      - uses: actions/download-artifact@v8
-        if: env.CWS_REFRESH_TOKEN != '' && env.CWS_EXTENSION_ID != ''
-        with:
-          name: browser-review-${{ needs.browser-review.outputs.version }}
-          path: release
-
-      - name: Upload and submit for review
-        if: env.CWS_REFRESH_TOKEN != '' && env.CWS_EXTENSION_ID != ''
-        run: |
-          api="https://chromewebstore.googleapis.com"
-          item="publishers/$CWS_PUBLISHER_ID/items/$CWS_EXTENSION_ID"
-          token=$(curl -sS --fail-with-body -X POST https://oauth2.googleapis.com/token \
-            -d client_id="$CWS_CLIENT_ID" -d client_secret="$CWS_CLIENT_SECRET" \
-            -d refresh_token="$CWS_REFRESH_TOKEN" -d grant_type=refresh_token | jq -r .access_token)
-          echo "::add-mask::$token"
-          echo "Uploading browser-review-$VERSION-chrome.zip"
-          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $token" \
-            -T "release/browser-review-$VERSION-chrome.zip" "$api/upload/v2/$item:upload" | tee upload.json
-          if grep -q IN_PROGRESS upload.json; then sleep 30; fi
-          echo "Submitting for review"
-          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $token" "$api/v2/$item:publish"
-
-  # ======================================================================================
-  # Margin for GitHub (github/)
-  # ======================================================================================
-
   margin-github:
     name: Margin for GitHub - test and package
+    needs: version
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: github
-    outputs:
-      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.ref }}
 
       - uses: pnpm/action-setup@v6
         with:
@@ -327,133 +183,133 @@ jobs:
       - name: Check the Firefox build with Mozilla's linter
         run: npx --yes web-ext lint --source-dir dist-firefox --output text
 
-      - name: Read the version
-        id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: List the packages
-        run: ls -l release
+      - run: ls -l release
 
       - uses: actions/upload-artifact@v7
         with:
-          name: margin-github-${{ steps.version.outputs.version }}
+          name: margin-github
           path: github/release/*
           if-no-files-found: error
 
-  margin-github-release:
-    name: Margin for GitHub - GitHub release
-    needs: margin-github
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  release:
+    name: Release Margin ${{ needs.version.outputs.version }}
+    needs: [version, browser-review, margin-github]
+    if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60 # Mozilla's automatic review usually takes minutes per add-on
     permissions:
       contents: write
-    defaults:
-      run:
-        working-directory: github
-    outputs:
-      created: ${{ steps.release.outputs.created }}
     env:
+      VERSION: ${{ needs.version.outputs.version }}
       GH_TOKEN: ${{ github.token }}
-      VERSION: ${{ needs.margin-github.outputs.version }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # tags and history for the release notes
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: margin-github-${{ needs.margin-github.outputs.version }}
-          path: github/release
-
-      - name: Create release github-v${{ needs.margin-github.outputs.version }} (once per version)
-        id: release
-        run: |
-          . ../.github/scripts/retry.sh
-          tag="github-v$VERSION"
-          state=$(gh release view "$tag" --json isDraft --jq .isDraft 2>/dev/null || echo none)
-          if [ "$state" = "false" ]; then
-            echo "Release $tag already exists: the version did not change, nothing to publish."
-            echo "created=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          prev=$(git tag --list 'github-v*' --sort=-v:refname | head -n 1)
-          {
-            echo "Install it from the website, or from the files below:"
-            echo
-            echo "- **Firefox 140+**: open \`margin-github-$VERSION-firefox.xpi\` in Firefox when it is attached (signed by Mozilla). Otherwise load \`margin-github-$VERSION-firefox.zip\` in \`about:debugging\`, **This Firefox**, **Load Temporary Add-on**."
-            echo "- **Chrome, Brave, Edge**: extract \`margin-github-$VERSION-chrome.zip\` into a folder you keep, open \`chrome://extensions\`, turn on **Developer mode** and click **Load unpacked** on that folder."
-            echo
-            echo "No token needed: it uses the GitHub session you are logged in with."
-            echo
-            echo "## Changes"
-            echo
-            git log --no-merges --format='- %s' ${prev:+"$prev"..}HEAD -- . ../brand
-          } > notes.md
-          cat notes.md
-          make_draft() {
-            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --draft --latest=false \
-              --target "$GITHUB_SHA" --title "Margin for GitHub $VERSION" --notes-file notes.md
-          }
-          retry make_draft
-          retry gh release upload "$tag" release/* --clobber
-          retry gh release edit "$tag" --draft=false --latest=false
-          echo "created=true" >> "$GITHUB_OUTPUT"
-
-      - name: Refresh margin-github-latest
-        if: steps.release.outputs.created == 'true'
-        run: |
-          ../.github/scripts/latest.sh margin-github-latest "Margin for GitHub" "$VERSION" \
-            "release/margin-github-$VERSION-chrome.zip=margin-github-chrome.zip" \
-            "release/margin-github-$VERSION-firefox.zip=margin-github-firefox.zip"
-
-      - name: Rebuild the website
-        if: steps.release.outputs.created == 'true'
-        env:
-          NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
-        run: ../.github/scripts/netlify.sh
-
-  margin-github-firefox:
-    name: Margin for GitHub - sign for Firefox
-    needs: [margin-github, margin-github-release]
-    if: needs.margin-github-release.outputs.created == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: write
-    env:
-      VERSION: ${{ needs.margin-github.outputs.version }}
       WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
       WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
       NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
-      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Skip without Mozilla API keys
-        if: env.WEB_EXT_API_KEY == '' || env.WEB_EXT_API_SECRET == ''
-        run: echo "::notice::Firefox signing skipped. Add the AMO_JWT_ISSUER and AMO_JWT_SECRET secrets (browser-review/docs/releasing.md)."
-
       - uses: actions/checkout@v7
-        if: env.WEB_EXT_API_KEY != ''
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+          fetch-depth: 0 # tags and history for the release notes
 
       - uses: actions/setup-node@v7
-        if: env.WEB_EXT_API_KEY != ''
         with:
           node-version: 26
           package-manager-cache: false
 
       - uses: actions/download-artifact@v8
-        if: env.WEB_EXT_API_KEY != ''
         with:
-          name: margin-github-${{ needs.margin-github.outputs.version }}
-          path: release
+          name: browser-review
+          path: built/browser-review
 
-      - name: Sign and attach to the releases
-        if: env.WEB_EXT_API_KEY != ''
+      - uses: actions/download-artifact@v8
+        with:
+          name: margin-github
+          path: built/margin-github
+
+      - name: Installers for Firefox (signed by Mozilla when the keys are set)
+        id: firefox
         run: |
-          # Build steps for a reviewer: cd github, pnpm install, pnpm package (Node 24+, pnpm).
-          git archive --format=zip -o source.zip HEAD github brand
-          .github/scripts/sign-firefox.sh "release/margin-github-$VERSION-firefox.zip" "margin-github-$VERSION-firefox.xpi"
-          gh release upload "github-v$VERSION" "margin-github-$VERSION-firefox.xpi" --clobber
-          cp "margin-github-$VERSION-firefox.xpi" margin-github-firefox.xpi
-          gh release upload margin-github-latest margin-github-firefox.xpi --clobber
-          .github/scripts/netlify.sh
+          mkdir -p out
+          if [ -n "$WEB_EXT_API_KEY" ] && [ -n "$WEB_EXT_API_SECRET" ]; then
+            # Mozilla reviews bundled code against its source: send the repo at this commit.
+            # Build steps for a reviewer: in browser-review/ or github/, pnpm install, pnpm package (Node 26, pnpm).
+            git archive --format=zip -o source.zip HEAD
+            .github/scripts/sign-firefox.sh "built/margin-github/margin-github-$VERSION-firefox.zip" out/margin-github-firefox.xpi
+            .github/scripts/sign-firefox.sh "built/browser-review/browser-review-$VERSION-firefox.zip" out/margin-browser-review-firefox.xpi
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Firefox builds are not signed, so they don't install for good. Add the AMO_JWT_ISSUER and AMO_JWT_SECRET secrets (browser-review/docs/releasing.md)."
+            cp "built/margin-github/margin-github-$VERSION-firefox.zip" out/margin-github-firefox.zip
+            cp "built/browser-review/browser-review-$VERSION-firefox.zip" out/margin-browser-review-firefox.zip
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Installers for Chrome, Brave, Edge
+        run: |
+          cp "built/margin-github/margin-github-$VERSION-chrome.zip" out/margin-github-chrome.zip
+          cp "built/browser-review/browser-review-$VERSION-chrome.zip" out/margin-browser-review-chrome.zip
+          ls -l out
+
+      - name: Publish the release v${{ needs.version.outputs.version }}
+        env:
+          FIREFOX_SIGNED: ${{ steps.firefox.outputs.signed }}
+        # Safe to rerun: it creates the release once and replaces its files.
+        run: |
+          . .github/scripts/retry.sh
+          tag="v$VERSION"
+          prev=$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vx "$tag" | head -n 1)
+          node scripts/release.ts notes "$VERSION" "$prev" > notes.md
+          cat notes.md
+          make_draft() {
+            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --draft \
+              --verify-tag --title "Margin $VERSION" --notes-file notes.md
+          }
+          retry make_draft
+          retry gh release edit "$tag" --notes-file notes.md
+          retry gh release upload "$tag" out/* --clobber
+          retry gh release edit "$tag" --draft=false --latest
+
+      - name: Rebuild the website
+        run: .github/scripts/netlify.sh
+
+  chrome-web-store:
+    name: Upload to the Chrome Web Store
+    needs: [version, release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+      CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+      CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+      CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+      BROWSER_REVIEW_ID: ${{ vars.CWS_EXTENSION_ID }}
+      GITHUB_EXTENSION_ID: ${{ vars.CWS_GITHUB_EXTENSION_ID }}
+    steps:
+      - name: Skip without Chrome Web Store credentials
+        if: env.CWS_REFRESH_TOKEN == ''
+        run: echo "::notice::Chrome Web Store upload skipped. Add the CWS_* secrets and variables (browser-review/docs/releasing.md)."
+
+      - uses: actions/download-artifact@v8
+        if: env.CWS_REFRESH_TOKEN != ''
+        with:
+          path: built
+
+      - name: Upload and submit for review
+        if: env.CWS_REFRESH_TOKEN != ''
+        run: |
+          api="https://chromewebstore.googleapis.com"
+          token=$(curl -sS --fail-with-body -X POST https://oauth2.googleapis.com/token \
+            -d client_id="$CWS_CLIENT_ID" -d client_secret="$CWS_CLIENT_SECRET" \
+            -d refresh_token="$CWS_REFRESH_TOKEN" -d grant_type=refresh_token | jq -r .access_token)
+          echo "::add-mask::$token"
+          upload() { # <store item id> <zip>
+            [ -n "$1" ] || { echo "::notice::No store id for $2, skipped."; return 0; }
+            item="publishers/$CWS_PUBLISHER_ID/items/$1"
+            echo "Uploading $2"
+            curl -sS --fail-with-body -X POST -H "Authorization: Bearer $token" -T "$2" "$api/upload/v2/$item:upload" | tee upload.json
+            if grep -q IN_PROGRESS upload.json; then sleep 30; fi
+            curl -sS --fail-with-body -X POST -H "Authorization: Bearer $token" "$api/v2/$item:publish"
+          }
+          upload "$BROWSER_REVIEW_ID" "built/browser-review/browser-review-$VERSION-chrome.zip"
+          upload "$GITHUB_EXTENSION_ID" "built/margin-github/margin-github-$VERSION-chrome.zip"
