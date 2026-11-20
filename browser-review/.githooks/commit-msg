@@ -1,4 +1,4 @@
 #!/bin/sh
 # Rejects commit messages that are not Conventional Commits (see CLAUDE.md).
 command -v node >/dev/null 2>&1 || { echo "commit-msg: node not found, skipping the check" >&2; exit 0; }
-exec node "$(git rev-parse --show-toplevel)/scripts/version.ts" check "$1"
+exec node "$(dirname "$0")/../scripts/version.ts" check "$1"
