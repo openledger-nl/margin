@@ -10,6 +10,7 @@ import { createHandler } from './app.ts';
 import { ConfigError, readConfig, type Config } from './config.ts';
 import { FsDb } from './fs-db.ts';
 import { Tokens } from './tokens.ts';
+import { Visits } from './visits.ts';
 
 const STAGING = 'https://staging.acme.com';
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
@@ -40,17 +41,19 @@ let anna: string;
 let bob: string;
 let andor: string;
 let config: Config;
+let visits: Visits;
 
 before(async () => {
   dir = await mkdtemp(join(tmpdir(), 'margin-app-'));
-  config = { project: 'acme-shop', origin: STAGING, dataDir: dir, host: '127.0.0.1', port: 0, commentsPerHour: 5 };
+  config = { project: 'acme-shop', origin: STAGING, dataDir: dir, host: '127.0.0.1', port: 0, commentsPerHour: 5, welcome: null };
   const db = await FsDb.open(dir, config.project);
   const tokens = new Tokens(dir);
   anna = await tokens.add('reviewer', 'Anna (client)');
   bob = await tokens.add('reviewer', 'Bob');
   andor = await tokens.add('developer', 'Andor');
   const overlay = { code: Buffer.from('console.log("margin")'), integrity: 'sha384-test' };
-  server = createServer(createHandler({ config, store: new Store(db), db, tokens, overlay, log: () => {} }));
+  visits = await Visits.open(dir);
+  server = createServer(createHandler({ config, store: new Store(db), db, tokens, overlay, visits, log: () => {} }));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -134,7 +137,34 @@ describe('customer to developer and back', () => {
   });
 });
 
+describe('visits', () => {
+  it('records the pages customers look at, only on the staging site, and shows them to developers', async () => {
+    const ok = await call('POST', '/api/review/visits', { ...asCustomer(anna), body: { url: `${STAGING}/pricing?ref=mail`, title: 'Pricing' } });
+    assert.equal(ok.status, 200);
+    const off = await call('POST', '/api/review/visits', { ...asCustomer(anna), body: { url: 'https://evil.example/x', title: 'x' } });
+    assert.equal(off.status, 400);
+    const seen = (await call('GET', '/api/dev/visits', { token: andor })).body.visits;
+    const v = seen.find((x: { path: string }) => x.path === '/pricing');
+    assert.deepEqual([v.by, v.title, v.origin], ['Anna (client)', 'Pricing', STAGING]);
+    assert.equal(JSON.stringify(seen).includes('ref=mail'), false, 'no query strings');
+    assert.equal((await call('GET', '/api/review/visits', asCustomer(bob))).body.visits.length, seen.length);
+  });
+
+  it('serves the overview page with a strict CSP', async () => {
+    const res = await fetch(`${base}/overview`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-security-policy') ?? '', /script-src 'self'/);
+    assert.match(await res.text(), /<script src="overview.js"><\/script>/);
+  });
+});
+
 describe('tokens', () => {
+  it('tells the overlay whose review token it has', async () => {
+    const me = await call('GET', '/api/review/me', asCustomer(anna));
+    assert.deepEqual(me.body, { name: 'Anna (client)', project: config.project, welcome: null });
+    assert.equal((await call('GET', '/api/review/me', { token: andor })).status, 403);
+  });
+
   it('needs a valid token of the right kind', async () => {
     assert.equal((await call('GET', '/api/review/comments', { origin: STAGING })).status, 401);
     assert.equal((await call('GET', '/api/review/comments', asCustomer('mrev_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'))).status, 401);

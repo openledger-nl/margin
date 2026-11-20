@@ -6,6 +6,8 @@
 //     feedback/0012-7.png   its screenshots
 //     counters.json         next ids
 //     deletions.json        ids of deleted comments, so developers can drop them too
+//     visits.json           pages reviewers looked at (visits.ts)
+//     site-map.md           every page with its visitors and feedback (site-map.ts), for the agent
 //
 // One process owns the folder: everything is kept in memory and written through.
 // The Store runs its writes one after the other, so there are no races here.
@@ -30,6 +32,8 @@ export class FsDb implements Db {
   readonly #shots = new Map<number, number>();
   #counters: Partial<Record<Counter, number>> = {};
   #deletions: Deletion[] = [];
+  /** Called after a comment changed or was deleted (the hub rewrites site-map.md). */
+  onChange: (() => void) | null = null;
 
   private constructor(dir: string, project: string) {
     this.#dir = dir;
@@ -69,6 +73,7 @@ export class FsDb implements Db {
     await writeFileAtomic(join(this.#dir, 'comments', `${fileId(c.id)}.json`), `${JSON.stringify(c, null, 2)}\n`);
     this.#comments.set(c.id, structuredClone(c));
     await this.#writeMarkdown(c);
+    this.onChange?.();
   }
 
   async deleteComment(id: number): Promise<void> {
@@ -82,6 +87,7 @@ export class FsDb implements Db {
     this.#comments.delete(id);
     this.#deletions.push({ id, at: new Date().toISOString() });
     await writeFileAtomic(join(this.#dir, 'deletions.json'), `${JSON.stringify(this.#deletions)}\n`);
+    this.onChange?.();
   }
 
   async putShot(shot: StoredShot): Promise<void> {

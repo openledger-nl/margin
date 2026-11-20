@@ -3,11 +3,14 @@
 //   /api/review/*   customers, with a review token from their link. Only from the staging site.
 //   /api/dev/*      developers (the Margin extension), with a developer token. Never from a web page.
 //   /margin.js      the overlay for the staging site (and /margin-<version>.js to pin with SRI)
+//   /overview       the feedback overview with the site map, for customers (overview.js)
 //   /help, /healthz
 //
 // Tokens are only managed with the CLI inside the container: there is no admin API.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { canDelete, isWebUrl, pageKey, ReviewError, STATUSES, type Comment, type Status, type Store } from '@brm/shared';
+import { OVERVIEW_HTML } from './overview-page.ts';
+import type { Visits } from './visits.ts';
 import type { Config } from './config.ts';
 import type { FsDb } from './fs-db.ts';
 import { HELP_HTML } from './help.ts';
@@ -22,6 +25,11 @@ export interface HubDeps {
   db: FsDb;
   tokens: Tokens;
   overlay: Overlay | null;
+  /** overview.js, the overview page's script (built with margin.js). */
+  overviewScript?: Overlay | null;
+  visits: Visits;
+  /** Called after a visit (the hub rewrites site-map.md). */
+  onVisit?: () => void;
   log?: (msg: string) => void;
   now?: () => Date;
 }
@@ -98,10 +106,13 @@ class RateLimit {
 }
 
 export function createHandler(deps: HubDeps): (req: IncomingMessage, res: ServerResponse) => void {
-  const { config, store, db, tokens, overlay } = deps;
+  const { config, store, db, tokens, overlay, visits } = deps;
+  const overviewScript = deps.overviewScript ?? null;
   const log = deps.log ?? ((msg: string) => console.error(`[margin-hub] ${msg}`));
   const now = deps.now ?? (() => new Date());
   const commentLimit = new RateLimit(config.commentsPerHour);
+  /** Page views per review token per hour: plenty for clicking around, not for a flood. */
+  const visitLimit = new RateLimit(600);
 
   async function caller(req: IncomingMessage, kind: TokenKind): Promise<Caller> {
     const auth = req.headers.authorization ?? '';
@@ -130,6 +141,23 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
     const method = req.method ?? 'GET';
     const [resource, rawId, action] = parts;
 
+    // The overlay's first call: checks the token and learns whose messages are "You".
+    if (resource === 'me' && !rawId && method === 'GET') {
+      return { status: 200, body: { name: who.name, project: config.project, welcome: config.welcome } };
+    }
+    if (resource === 'visits' && !rawId) {
+      if (method === 'GET') return { status: 200, body: { visits: visits.list() } };
+      if (method === 'POST') {
+        const body = parseObject(await readBody(req, SMALL_BODY));
+        const url = str(body.url, 'url', 2048);
+        const title = body.title === undefined ? '' : str(body.title, 'title', 300, { empty: true });
+        if (!isWebUrl(url) || pageKey(url).origin !== config.origin) throw new HttpError(400, `Visits are only for pages on ${config.origin}.`);
+        if (!visitLimit.take(who.name, now().getTime())) throw new HttpError(429, 'Too many page views in the last hour.');
+        await visits.record(who.name, url, title, now());
+        deps.onVisit?.();
+        return { status: 200, body: { ok: true } };
+      }
+    }
     if (resource === 'comments' && !rawId) {
       if (method === 'GET') return { status: 200, body: await store.list() };
       if (method === 'POST') {
@@ -186,6 +214,9 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
     const method = req.method ?? 'GET';
     const [resource, rawId, action] = parts;
 
+    if (resource === 'visits' && !rawId && method === 'GET') {
+      return { status: 200, body: { visits: visits.list() } };
+    }
     if (resource === 'project' && !rawId && method === 'GET') {
       return { status: 200, body: { name: config.project, origin: config.origin, version: VERSION, you: who.name } };
     }
@@ -259,6 +290,24 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
         'Cache-Control': 'public, max-age=300',
       });
       res.end(HELP_HTML);
+      return;
+    }
+    if (path === '/overview' && method === 'GET') {
+      res.writeHead(200, {
+        ...COMMON_HEADERS,
+        'Content-Type': 'text/html; charset=utf-8',
+        // Only its own script and its own API, on the staging site's origin (/__margin/).
+        'Content-Security-Policy':
+          "default-src 'none'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+        'Cache-Control': 'no-store',
+      });
+      res.end(OVERVIEW_HTML);
+      return;
+    }
+    if (path === '/overview.js' && method === 'GET') {
+      if (!overviewScript) return send(res, 404, { error: 'This hub was built without the overview page.' });
+      res.writeHead(200, { ...COMMON_HEADERS, 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+      res.end(overviewScript.code);
       return;
     }
     if (path === '/margin.js' && method === 'GET') return serveOverlay(res, false);

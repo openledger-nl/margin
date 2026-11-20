@@ -9,10 +9,14 @@ RUN npm install -g pnpm@12.9.1 --no-fund --no-audit
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json LICENSE ./
 COPY shared/package.json shared/
 COPY hub/package.json hub/
-RUN pnpm install --frozen-lockfile --filter "@brm/hub..." --ignore-scripts
+COPY extension/package.json extension/
+RUN pnpm install --frozen-lockfile --filter "@brm/hub..." --filter "@brm/extension..." --ignore-scripts
 COPY shared/ shared/
 COPY hub/ hub/
-RUN pnpm --dir hub build
+COPY extension/build-embed.ts extension/
+COPY extension/src/ extension/src/
+# margin.js (the staging overlay) first: the hub build copies it in.
+RUN pnpm --dir extension build:embed && pnpm --dir hub build
 
 FROM node:26-alpine
 ENV NODE_ENV=production \

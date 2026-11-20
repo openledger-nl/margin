@@ -2,12 +2,15 @@
 // margin-hub: the review hub server, and the commands to manage its tokens.
 // In Docker: `docker compose exec margin margin token add --reviewer "Anna (client)"`.
 import { createServer } from 'node:http';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Store } from '@brm/shared';
+import { Store, buildSiteMap, formatSiteMap } from '@brm/shared';
 import { createHandler } from './app.ts';
 import { ConfigError, readConfig, type Config } from './config.ts';
 import { FsDb } from './fs-db.ts';
 import { loadOverlay } from './overlay.ts';
+import { Visits } from './visits.ts';
+import { writeFileAtomic } from './files.ts';
 import { TokenError, Tokens, type TokenKind } from './tokens.ts';
 import { VERSION } from './version.ts';
 
@@ -54,8 +57,17 @@ async function serve(config: Config): Promise<void> {
   const db = await FsDb.open(config.dataDir, config.project);
   const store = new Store(db);
   const tokens = new Tokens(config.dataDir);
+  const visits = await Visits.open(config.dataDir);
   const overlay = await loadOverlay(overlayPath());
-  const server = createServer(createHandler({ config, store, db, tokens, overlay }));
+  const overviewScript = await loadOverlay(join(dirname(overlayPath()), 'overview.js'));
+  // site-map.md: every page with its visitors and feedback, rewritten (at most once a second) after a change.
+  const siteMap = debounced(1000, async () => {
+    const md = formatSiteMap(buildSiteMap(await store.list(), visits.list()), { project: config.project, origin: config.origin });
+    await writeFileAtomic(join(config.dataDir, 'site-map.md'), md);
+  });
+  db.onChange = siteMap;
+  siteMap();
+  const server = createServer(createHandler({ config, store, db, tokens, overlay, overviewScript, visits, onVisit: siteMap }));
   server.requestTimeout = 60_000;
   server.headersTimeout = 20_000;
   await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve));
@@ -139,4 +151,16 @@ if (command === '--version' || command === '-v') {
     if (err instanceof ConfigError || err instanceof TokenError) fail(err.message);
     throw err;
   }
+}
+
+/** Runs fn at most once per ms, after the last call; errors are logged, never thrown. */
+function debounced(ms: number, fn: () => Promise<void>): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      fn().catch((err: unknown) => console.error(`[margin-hub] site-map.md: ${err instanceof Error ? err.message : String(err)}`));
+    }, ms);
+  };
 }

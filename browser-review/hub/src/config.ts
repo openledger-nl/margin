@@ -11,6 +11,8 @@ export interface Config {
   port: number;
   /** Most comments one review token may create per hour. */
   commentsPerHour: number;
+  /** Text customers see the first time, with {name} for theirs. Null: the default welcome. */
+  welcome: string | null;
 }
 
 export class ConfigError extends Error {}
@@ -52,5 +54,13 @@ export function readConfig(env: Record<string, string | undefined>): Config {
     host: env.HOST?.trim() || '0.0.0.0',
     port,
     commentsPerHour,
+    welcome: readWelcome(env.MARGIN_WELCOME),
   };
+}
+
+function readWelcome(value: string | undefined): string | null {
+  const text = value?.trim();
+  if (!text) return null;
+  if (text.length > 1000) throw new ConfigError('MARGIN_WELCOME is at most 1000 characters.');
+  return text;
 }

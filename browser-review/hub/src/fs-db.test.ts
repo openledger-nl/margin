@@ -40,7 +40,7 @@ describe('FsDb', () => {
     const md = await readFile(join(dir, 'feedback', '0001.md'), 'utf8');
     assert.match(md, /^---\nid: 1\nproject: "acme-shop"\nstatus: "open"/);
     assert.match(md, /reviewers: "Anna \(client\)"/);
-    assert.match(md, /- User \(Anna \(client\)\) \(.+\): The button is too light/);
+    assert.match(md, /- User "Anna \(client\)" \(.+\): The button is too light/);
     assert.match(md, /!\[Page, when the comment was made\]\(0001-1\.png\)/);
 
     const again = new Store(await FsDb.open(dir, 'acme-shop'));

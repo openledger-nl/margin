@@ -5,7 +5,9 @@
 release
 demo
 docs
-extension
+extension/static
+extension/*.ts
+!extension/build-embed.ts
 server
 scripts
 .githooks
