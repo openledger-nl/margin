@@ -1,0 +1,644 @@
+/*
+ * Margin. Loaded on every github.com page, so every rule is
+ * scoped to Margin's own elements. Colors come from GitHub's own CSS
+ * variables, so light, dark and high-contrast themes all just work.
+ */
+
+/* ---------- taking over the homepage ---------- */
+
+html.hb-pending .application-main {
+  visibility: hidden;
+}
+html.hb-home .hb-container > :not(#hb-root) {
+  display: none !important;
+}
+
+/* ---------- GitHub's side menu: its "Top repositories" swapped for ours (src/sidepanel.ts) ---------- */
+
+[data-hb-recent] ul > li:not(.hb-sp-item),
+[data-hb-recent] [data-testid='dynamic-side-panel-items-search-button'] {
+  display: none !important;
+}
+
+/* ---------- tokens ---------- */
+
+.hb,
+.hb-settings {
+  --hb-fg: var(--fgColor-default, #1f2328);
+  --hb-muted: var(--fgColor-muted, #59636e);
+  --hb-accent: var(--fgColor-accent, #0969da);
+  --hb-danger: var(--fgColor-danger, #d1242f);
+  --hb-success: var(--fgColor-success, #1a7f37);
+  --hb-attention: var(--fgColor-attention, #9a6700);
+  --hb-bg: var(--bgColor-default, #ffffff);
+  --hb-bg-muted: var(--bgColor-muted, #f6f8fa);
+  --hb-border: var(--borderColor-default, #d1d9e0);
+  --hb-border-muted: var(--borderColor-muted, #d1d9e0b3);
+  --hb-primary-bg: var(--button-primary-bgColor-rest, #1f883d);
+  --hb-primary-fg: var(--button-primary-fgColor-rest, #ffffff);
+  --hb-radius: 6px;
+  color: var(--hb-fg);
+}
+
+/* ---------- page ---------- */
+
+.hb {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 24px 32px 64px;
+  font-size: 14px;
+}
+.hb-width-wide {
+  max-width: 1800px;
+  margin: 0 auto;
+}
+.hb-width-centered {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+@media (max-width: 700px) {
+  .hb {
+    padding: 16px 16px 48px;
+  }
+}
+.hb *,
+.hb *::before,
+.hb *::after {
+  box-sizing: border-box;
+}
+.hb h1,
+.hb h2,
+.hb p {
+  margin: 0;
+}
+
+.hb-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  margin-bottom: 16px;
+}
+.hb-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 600;
+}
+.hb-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hb-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.hb-grid {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.hb-side,
+.hb-side-only {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.hb-side-only {
+  max-width: 640px;
+}
+.hb-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .hb-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- shared bits ---------- */
+
+/* No underlines anywhere in Margin, also not with GitHub's "link underlines" setting: hover changes the color instead. */
+.hb a,
+.hb a:hover,
+.hb .hb-link,
+.hb .hb-link:hover {
+  text-decoration: none !important;
+}
+
+.hb-card {
+  border: 1px solid var(--hb-border);
+  border-radius: var(--hb-radius);
+  background: var(--hb-bg);
+  min-width: 0;
+}
+.hb-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hb-border-muted);
+}
+.hb-card-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.hb-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--hb-muted);
+}
+.hb-pad {
+  padding: 12px 16px;
+}
+.hb-muted {
+  color: var(--hb-muted);
+}
+.hb-small {
+  font-size: 12px;
+}
+.hb-icon {
+  flex: none;
+  vertical-align: text-bottom;
+}
+.hb-spin {
+  animation: hb-spin 0.9s linear infinite;
+}
+@keyframes hb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hb-spin {
+    animation: none;
+  }
+}
+
+.hb-avatar {
+  flex: none;
+  border-radius: 50%;
+  background: var(--hb-bg-muted);
+  box-shadow: 0 0 0 1px var(--hb-border-muted);
+}
+.hb-avatar-small {
+  border-radius: 4px;
+}
+
+.hb-counter {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--hb-bg-muted);
+  border: 1px solid var(--hb-border-muted);
+  color: var(--hb-fg);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+}
+.hb-label {
+  display: inline-block;
+  padding: 0 7px;
+  border: 1px solid var(--hb-border);
+  border-radius: 999px;
+  color: var(--hb-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.hb-label-attention {
+  border-color: currentColor;
+  color: var(--hb-attention);
+}
+
+/* ---------- controls ---------- */
+
+.hb .hb-btn,
+.hb-settings .hb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--hb-border);
+  border-radius: var(--hb-radius);
+  background: var(--hb-bg-muted);
+  color: var(--hb-fg);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+.hb .hb-btn:hover,
+.hb-settings .hb-btn:hover {
+  border-color: var(--hb-muted);
+  text-decoration: none;
+}
+.hb .hb-btn:disabled,
+.hb-settings .hb-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.hb .hb-btn-primary,
+.hb-settings .hb-btn-primary {
+  border-color: transparent;
+  background: var(--hb-primary-bg);
+  color: var(--hb-primary-fg);
+}
+.hb .hb-btn-small {
+  height: 28px;
+  padding: 0 10px;
+}
+.hb .hb-icon-btn {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+.hb .hb-quick .hb-btn {
+  color: var(--hb-fg);
+}
+.hb .hb-quick .hb-icon {
+  color: var(--hb-muted);
+}
+
+.hb .hb-link,
+.hb-settings .hb-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--hb-accent);
+  font: inherit;
+  cursor: pointer;
+}
+.hb .hb-link:hover {
+  opacity: 0.8;
+}
+
+.hb .hb-input,
+.hb-settings .hb-input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hb-border);
+  border-radius: var(--hb-radius);
+  background: var(--hb-bg);
+  color: var(--hb-fg);
+  font: inherit;
+}
+.hb .hb-input:focus-visible,
+.hb-settings .hb-input:focus-visible {
+  outline: 2px solid var(--hb-accent);
+  outline-offset: -1px;
+  border-color: var(--hb-accent);
+}
+.hb-grow {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.hb-input-small {
+  width: 72px;
+}
+
+.hb-banner {
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  border: 1px solid var(--hb-border);
+  border-radius: var(--hb-radius);
+  background: var(--hb-bg-muted);
+}
+.hb-banner-error {
+  border-color: var(--hb-danger);
+  color: var(--hb-danger);
+}
+
+/* ---------- organizations ---------- */
+
+.hb-owners {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+}
+.hb-owner {
+  display: flex;
+  align-items: center;
+  border-radius: var(--hb-radius);
+}
+.hb-owner:hover {
+  background: var(--hb-bg-muted);
+}
+.hb-owner.hb-active {
+  background: var(--hb-bg-muted);
+  box-shadow: inset 2px 0 0 var(--hb-accent);
+}
+.hb .hb-owner-pick {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  color: var(--hb-fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hb-owner-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hb .hb-owner-open {
+  display: flex;
+  padding: 6px 8px;
+  color: var(--hb-muted);
+  opacity: 0;
+}
+.hb-owner:hover .hb-owner-open,
+.hb .hb-owner-open:focus-visible {
+  opacity: 1;
+}
+.hb .hb-owner-open:hover {
+  color: var(--hb-accent);
+}
+@media (hover: none) {
+  .hb .hb-owner-open {
+    opacity: 1;
+  }
+}
+
+/* ---------- recently pushed: a list in the left column ---------- */
+
+.hb-recent {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+.hb .hb-recent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--hb-radius);
+  color: var(--hb-fg);
+}
+.hb .hb-recent-item:hover {
+  background: var(--hb-bg-muted);
+}
+.hb .hb-recent-item:hover .hb-recent-name {
+  color: var(--hb-accent);
+}
+.hb-recent-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.hb-recent-name,
+.hb-recent-branch {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hb-recent-name {
+  font-weight: 600;
+}
+.hb-recent-branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--hb-muted);
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.hb-recent-branch .hb-icon {
+  width: 12px;
+  height: 12px;
+}
+.hb-recent-name .hb-muted {
+  font-weight: 400;
+}
+.hb-recent-time {
+  flex: none;
+  color: var(--hb-muted);
+  font-size: 12px;
+}
+
+/* ---------- repositories ---------- */
+
+.hb-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hb-border-muted);
+}
+.hb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  margin: 0;
+  cursor: pointer;
+}
+/* A grid of cells filling the width; lines drawn like .hb-recent. */
+.hb-repos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  border-radius: 0 0 var(--hb-radius) var(--hb-radius);
+}
+.hb-repo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 14px 16px;
+  box-shadow:
+    1px 0 0 var(--hb-border-muted),
+    0 1px 0 var(--hb-border-muted);
+}
+.hb-repos-list {
+  grid-template-columns: minmax(0, 1fr);
+}
+.hb-repos-list .hb-repo {
+  padding: 10px 16px;
+}
+@media (max-width: 420px) {
+  .hb-repos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.hb-repo-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.hb .hb-repo-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--hb-accent);
+}
+.hb .hb-repo-name:hover {
+  opacity: 0.8;
+}
+.hb .hb-repo-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+.hb-repo-owner {
+  font-weight: 400;
+}
+.hb-repo-desc {
+  margin-top: 4px !important;
+  color: var(--hb-muted);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hb-repo-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: auto;
+  padding-top: 8px;
+  color: var(--hb-muted);
+  font-size: 12px;
+}
+.hb-repo-meta > *,
+.hb-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hb .hb-repo-meta a {
+  color: var(--hb-muted);
+}
+.hb .hb-repo-meta a:hover {
+  color: var(--hb-accent);
+}
+.hb-lang-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--hb-border-muted);
+}
+.hb .hb-more {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-top: 1px solid var(--hb-border-muted);
+  border-radius: 0 0 var(--hb-radius) var(--hb-radius);
+  background: none;
+  color: var(--hb-accent);
+  font: inherit;
+  cursor: pointer;
+}
+.hb .hb-more:hover {
+  background: var(--hb-bg-muted);
+}
+
+/* ---------- settings (the toolbar popup) ---------- */
+
+.hb-settings {
+  font-size: 14px;
+}
+.hb-settings p {
+  margin: 0 0 8px;
+}
+.hb-set-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--hb-border-muted);
+}
+.hb-set-section:last-child {
+  border-bottom: 0;
+}
+.hb-settings h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.hb-settings code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--hb-bg-muted);
+  font-size: 12px;
+}
+.hb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.hb-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  font-weight: 400;
+  cursor: pointer;
+}
+.hb-check input[type='checkbox'] {
+  margin: 3px 0 0;
+}
+.hb-check.hb-indent,
+.hb-field.hb-indent {
+  padding-left: 24px;
+}
+.hb-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+.hb-field select {
+  max-width: 190px;
+}
+.hb-check-label {
+  display: block;
+}
+.hb-hint {
+  display: block;
+  color: var(--hb-muted);
+  font-size: 12px;
+}
+.hb-status {
+  min-height: 1.5em;
+  color: var(--hb-muted);
+  font-size: 12px;
+}
+.hb-status[data-kind='ok'] {
+  color: var(--hb-success);
+}
+.hb-status[data-kind='error'] {
+  color: var(--hb-danger);
+}

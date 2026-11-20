@@ -1,0 +1,51 @@
+{
+  "name": "browser-review-mcp",
+  "version": "1.1.0",
+  "license": "MIT",
+  "description": "MCP server for the Margin Browser Review extension: Claude Code reads, fixes and resolves the review comments you leave on your localhost app.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "claude-code",
+    "browser-extension",
+    "design-review",
+    "localhost"
+  ],
+  "homepage": "https://github.com/andor00/browser-review-mcp#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andor00/browser-review-mcp.git",
+    "directory": "server"
+  },
+  "bugs": "https://github.com/andor00/browser-review-mcp/issues",
+  "type": "module",
+  "bin": {
+    "browser-review-mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node build.ts",
+    "start": "node src/cli.ts",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc -p .",
+    "prepublishOnly": "node build.ts && BRM_CLI=dist/cli.js node --test src/cli.test.ts"
+  },
+  "devDependencies": {
+    "@brm/shared": "workspace:*",
+    "@modelcontextprotocol/client": "^2.4.0",
+    "@modelcontextprotocol/server": "^2.4.0",
+    "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
+    "ws": "^8.22.1",
+    "zod": "^4.6.7"
+  }
+}
