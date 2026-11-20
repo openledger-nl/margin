@@ -37,7 +37,7 @@ the first holds the port (hub), the rest connect to it (/peer).
 pnpm build           # extension/dist, extension/dist-firefox, server/dist/cli.js
 pnpm dev             # watch + hot reload of extension/dist (dev:firefox: dist-firefox)
 pnpm demo            # demo app on http://localhost:5173 to try it on
-pnpm demo:hub        # the demo as a staging site with the hub (see README, Development)
+pnpm demo:hub        # the demo as a staging site with the hub: README, "Try the customer flow locally"
 pnpm test            # all tests
 pnpm typecheck       # all packages
 pnpm package         # release/browser-review-<version>-chrome.zip and -firefox.zip

@@ -480,7 +480,7 @@ customer's overview it opens in their site tab). Pages you opened in this sessio
 Both are saved on the hub (`review.json`) right away.
 
 Setup, the nginx rule, the API and where each file lives:
-[hub/README.md](hub/README.md). Try it locally with the demo: [Development](#development).
+[hub/README.md](hub/README.md). Try it locally: [Try the customer flow locally](#try-the-customer-flow-locally-dev-compose).
 
 ## Where the data lives
 
@@ -534,17 +534,82 @@ html-to-image, and `pnpm build:hub` builds it into the hub. The extension's side
 of projects is `extension/src/sync.ts` (pull, and pushing status changes to the
 hub first) and `hub-client.ts`.
 
-Try the whole flow locally: start the hub with the demo's compose file, then the
-demo as a staging site with `pnpm demo:hub` (it proxies `/__margin/` and loads
-`margin.js`). The hub's data is the folder `demo/.margin/` (not committed), so you
-see each comment appear as Markdown and PNG in `demo/.margin/feedback/` while you test:
+### Try the customer flow locally (dev compose)
+
+The demo app plays the staging site, and `demo/docker-compose.yml` runs the review hub next
+to it. The hub keeps its data in the plain folder `demo/.margin/` (not committed), so you can
+watch each comment appear as Markdown and PNG while you test. You need Docker (with Compose),
+Node 26 and pnpm. All commands run from `browser-review/`.
+
+1. **Install and build** (once, and after pulling):
+
+   ```sh
+   pnpm install
+   pnpm build          # extension/dist, for step 5
+   ```
+
+2. **Start the hub** (it builds the image the first time, about a minute):
+
+   ```sh
+   docker compose -f demo/docker-compose.yml up -d --build
+   ```
+
+   It runs as uid 1000, so the files in `demo/.margin/` are yours. If your uid is different:
+   `MARGIN_UID=$(id -u) MARGIN_GID=$(id -g) docker compose -f demo/docker-compose.yml up -d --build`.
+
+3. **Start the demo as the staging site** (keep it running, in its own terminal):
+
+   ```sh
+   pnpm demo:hub       # http://localhost:5173, loads margin.js, proxies /__margin/ to the hub
+   ```
+
+4. **Be a customer:** make a review link and open it, best in a private window so you see the
+   welcome:
+
+   ```sh
+   docker compose -f demo/docker-compose.yml exec margin margin token add --reviewer "Milan"
+   # → http://localhost:5173/?review_token=mrev_…
+   ```
+
+   Comment, then look in `demo/.margin/feedback/` and `demo/.margin/site-map.md`. Overview in
+   the toolbar opens the customer's overview (`/__margin/overview`).
+
+5. **Be the developer:** load `extension/dist` in your browser (see the next section), make a
+   developer token, and add the project on the extension's help page (**Customer feedback from
+   staging**) with the hub URL `http://localhost:5173/__margin/`:
+
+   ```sh
+   docker compose -f demo/docker-compose.yml exec margin margin token add --developer "You"
+   ```
+
+   In the sidebar pick **demo: customer feedback**; a project's **Overview** has the Review
+   settings (focus pages, who sees what). For the agent side, put
+   `{ "project": "demo" }` in `.margin/project.json` of the repo you run your agent in.
+
+6. **Try your own look** (optional): copy the examples into the data folder; the hub picks them
+   up by itself. Delete them to get the Margin look back.
+
+   ```sh
+   cp hub/brand.example.json demo/.margin/brand.json
+   cp hub/logo.example.svg demo/.margin/logo.svg
+   docker compose -f demo/docker-compose.yml exec margin margin brand check
+   ```
+
+**After changing code:** the hub serves `margin.js` and the overview from its image, so rebuild
+it: `docker compose -f demo/docker-compose.yml up -d --build` (the data stays). Then reload the
+page; the browser may cache `margin.js` for 5 minutes, so use a hard reload. For the extension:
+`pnpm build` (or `pnpm dev`) and reload it on `chrome://extensions`.
+
+**Logs, stop, start over:**
 
 ```sh
-docker compose -f demo/docker-compose.yml up -d --build
-pnpm demo:hub
-docker compose -f demo/docker-compose.yml exec margin margin token add --reviewer "Test"   # open the link it prints
-docker compose -f demo/docker-compose.yml exec margin margin token add --developer "You"  # add the project on the help page
+docker compose -f demo/docker-compose.yml logs -f margin      # what the hub says
+docker compose -f demo/docker-compose.yml down                # stop (data stays in demo/.margin/)
+find demo/.margin -mindepth 1 ! -name .gitignore -delete      # start over: all comments and tokens gone
 ```
+
+Not for a real staging server: there, use a named volume and a reverse proxy, see
+[hub/README.md](hub/README.md).
 
 ### Run the extension from source (hot reload)
 
