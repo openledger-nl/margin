@@ -49,4 +49,13 @@ describe('mergeVisit', () => {
     assert.equal(list.length, 2);
     assert.deepEqual([list[0]!.count, list[0]!.title, list[0]!.lastAt], [2, 'Home!', '2026-11-20T10:02:00.000Z']);
   });
+
+  it('shows focus pages, also before anyone opened them', () => {
+    const tree = buildSiteMap([], [], [{ path: '/checkout/pay', note: 'Try a wrong card' }]);
+    const pay = tree.children[0]!.children[0]!;
+    assert.equal(pay.path, '/checkout/pay');
+    assert.equal(pay.focus, 'Try a wrong card');
+    assert.equal(pay.visited, false);
+    assert.match(formatSiteMap(tree, { project: 'p', origin: 'o' }), /`\/checkout\/pay` focus page \("Try a wrong card"\), not visited/);
+  });
 });

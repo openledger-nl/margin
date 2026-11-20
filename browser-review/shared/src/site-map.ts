@@ -1,7 +1,7 @@
 // The site as a tree of pages, from the comments and the page visits: which pages
 // were looked at, by whom, and what feedback was given where. The overview page
 // shows it; the review hub also writes it as site-map.md for the agent.
-import { STATUSES, STATUS_LABELS, type Comment, type PageVisit, type Status } from './index.ts';
+import { STATUSES, STATUS_LABELS, type Comment, type FocusPage, type PageVisit, type Status } from './index.ts';
 
 export interface SiteNode {
   path: string;
@@ -15,6 +15,8 @@ export interface SiteNode {
   lastAt: string | null;
   comments: Comment[];
   counts: Record<Status, number>;
+  /** A page the team asked reviewers to look at: its note ('' without one), else null. */
+  focus: string | null;
   /** This page and everything under it. */
   total: number;
   children: SiteNode[];
@@ -22,7 +24,7 @@ export interface SiteNode {
 
 function node(path: string): SiteNode {
   const segment = path === '/' ? '/' : path.slice(path.lastIndexOf('/') + 1);
-  return { path, segment, title: null, visited: false, visitors: [], lastAt: null, comments: [], counts: { open: 0, in_progress: 0, review_ready: 0, accepted: 0 }, total: 0, children: [] };
+  return { path, segment, title: null, visited: false, visitors: [], lastAt: null, comments: [], counts: { open: 0, in_progress: 0, review_ready: 0, accepted: 0 }, focus: null, total: 0, children: [] };
 }
 
 function later(a: string | null, b: string): string {
@@ -46,7 +48,7 @@ export function mergeVisit(list: PageVisit[], v: { origin: string; path: string;
 }
 
 /** The tree for one site. Parents of visited or commented pages are there too, even if nobody opened them. */
-export function buildSiteMap(comments: Comment[], visits: PageVisit[]): SiteNode {
+export function buildSiteMap(comments: Comment[], visits: PageVisit[], focus: FocusPage[] = [], paths: string[] = []): SiteNode {
   const nodes = new Map<string, SiteNode>();
   const get = (path: string): SiteNode => {
     let n = nodes.get(path);
@@ -61,6 +63,8 @@ export function buildSiteMap(comments: Comment[], visits: PageVisit[]): SiteNode
     return n;
   };
   const root = get('/');
+  for (const f of focus) get(f.path).focus = f.note;
+  for (const p of paths) get(p);
   for (const v of visits) {
     const n = get(v.path);
     n.visited = true;
@@ -93,7 +97,7 @@ export function formatSiteMap(root: SiteNode, info: { project: string; origin: s
     const indent = '  '.repeat(depth);
     const who = n.visitors.map((v) => v.by).join(', ');
     const counts = STATUSES.filter((s) => n.counts[s]).map((s) => `${n.counts[s]} ${STATUS_LABELS[s].toLowerCase()}`).join(', ');
-    const facts = [n.title ? JSON.stringify(n.title) : null, n.visited ? `visited by ${who}` : 'not visited', counts || (n.visited ? 'no feedback' : null)].filter(Boolean);
+    const facts = [n.title ? JSON.stringify(n.title) : null, n.focus !== null ? `focus page${n.focus ? ` (${JSON.stringify(n.focus)})` : ''}` : null, n.visited ? `visited by ${who}` : 'not visited', counts || (n.visited ? 'no feedback' : null)].filter(Boolean);
     out.push(`${indent}- \`${n.path}\` ${facts.join(', ')}`);
     for (const c of n.comments) {
       const first = c.messages.find((m) => m.author === 'user');

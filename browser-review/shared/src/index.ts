@@ -6,6 +6,8 @@ export { cropBox } from './crop.ts';
 export { Store, MemoryDb, isWebUrl, type Db, type StoredShot, type Counter, type ListFilter } from './store.ts';
 export { formatComment, formatListLine } from './format.ts';
 export { buildSiteMap, formatSiteMap, mergeVisit, type SiteNode } from './site-map.ts';
+export { activeSession, leaveSession, touchSession, SESSION_GAP_MS, type BrowseSession } from './session.ts';
+export { NO_BRAND, brandTokens, contrast, luminance, normalizeHex, textOn, type Brand } from './theme.ts';
 
 export const STATUSES = ['open', 'in_progress', 'review_ready', 'accepted'] as const;
 export type Status = (typeof STATUSES)[number];
@@ -134,6 +136,24 @@ export interface SendDecision {
   decision: 'fixed' | 'question';
   message: string;
 }
+
+/** A page the team asks customers to look at, with an optional note ("check the prices"). */
+export interface FocusPage {
+  /** As pageKey(): "/pricing". */
+  path: string;
+  note: string;
+}
+
+/** Set by the developer for a review-hub project; the hub keeps it in review.json. */
+export interface ReviewSettings {
+  focusPages: FocusPage[];
+  /** Customers see each other's comments and visits. Default false: each sees only their own. */
+  share: boolean;
+  /** Per customer (review token name): overrides share. */
+  shareFor: Record<string, boolean>;
+}
+
+export const DEFAULT_REVIEW_SETTINGS: ReviewSettings = { focusPages: [], share: false, shareFor: {} };
 
 /** A page someone looked at with the toolbar on. Path, title and time only: no query, no clicks. */
 export interface PageVisit {
