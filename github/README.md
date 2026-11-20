@@ -57,24 +57,30 @@ out public repositories of others, which would otherwise always be on top.
 
 ## Install
 
+Download the newest build from the
+[margin-github-latest release](https://github.com/openledger-nl/margin/releases/tag/margin-github-latest)
+(or from the website).
+
+- **Firefox** (140 or newer): open `margin-github-firefox.xpi` in Firefox. It is
+  signed by Mozilla, so it installs for good. Until a signed build is there, use
+  `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → pick
+  `margin-github-firefox.zip` (gone after a restart). Don't use "Install Add-on
+  From File" with the zip: Firefox reports an unsigned add-on as "corrupt".
+- **Chrome / Brave / Edge**: extract `margin-github-chrome.zip` into a folder you
+  keep, open `chrome://extensions`, turn on Developer mode, click Load unpacked
+  and pick that folder. Chrome only installs in one click from the Chrome Web
+  Store.
+
+Every version also has its own release, `github-v<version>`. CI
+(`.github/workflows/margin-github.yml`) makes one when the version in
+`package.json` goes up on `main`.
+
+From source:
+
 ```sh
 pnpm install
 pnpm build        # dist/ (Chrome, Brave, Edge) and dist-firefox/
 ```
-
-- **Chrome / Brave / Edge**: `chrome://extensions` → turn on Developer mode →
-  Load unpacked → pick `dist/`.
-- **Firefox** (140 or newer): `about:debugging#/runtime/this-firefox` → Load
-  Temporary Add-on → pick `dist-firefox/manifest.json` (or the Firefox zip).
-  A temporary add-on is gone after a restart.
-
-  Do not use "Install Add-on From File" in `about:addons` with the zip:
-  Firefox only installs signed add-ons that way and reports an unsigned one as
-  "corrupt". To install it for good, sign it (free) as an unlisted add-on on
-  addons.mozilla.org: `pnpm package`, upload the Firefox zip, then install the
-  signed `.xpi` you get back. Firefox Developer Edition and Nightly can also
-  install it unsigned after setting `xpinstall.signatures.required` to
-  `false` in `about:config`.
 
 ## Develop
 
