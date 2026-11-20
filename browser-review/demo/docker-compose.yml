@@ -1,0 +1,31 @@
+# The margin review hub for the demo, for testing. Its data is a plain folder,
+# demo/.margin/, so you can read the feedback while you test:
+#
+#   demo/.margin/feedback/0001.md     the comment as Markdown (what the agent gets)
+#   demo/.margin/feedback/0001-1.png  its screenshots
+#   demo/.margin/comments/0001.json   the source of truth
+#
+# From browser-review/:
+#   docker compose -f demo/docker-compose.yml up -d --build
+#   pnpm demo:hub                                  # the demo as the staging site
+#   docker compose -f demo/docker-compose.yml exec margin margin token add --reviewer "Test"
+#   docker compose -f demo/docker-compose.yml exec margin margin token add --developer "You"
+#
+# Not for a real staging server: there, use a named volume (hub/docker-compose.example.yml).
+services:
+  margin:
+    build:
+      context: ..
+      dockerfile: hub/Dockerfile
+    image: margin-hub:dev
+    container_name: margin-demo-hub
+    # Runs as you, so the files in demo/.margin are yours. Another uid than 1000:
+    #   MARGIN_UID=$(id -u) MARGIN_GID=$(id -g) docker compose -f demo/docker-compose.yml up -d
+    user: '${MARGIN_UID:-1000}:${MARGIN_GID:-1000}'
+    environment:
+      MARGIN_PROJECT: demo
+      MARGIN_ORIGIN: http://localhost:5173
+    ports:
+      - '127.0.0.1:4780:4780' # pnpm demo:hub proxies /__margin/ to it
+    volumes:
+      - ./.margin:/data/.margin
