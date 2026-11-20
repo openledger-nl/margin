@@ -1,7 +1,7 @@
 import { before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
-import type { BridgeCalls, BridgeMethod, Comment } from '@brm/shared';
+import type { BridgeCalls, BridgeMethod, Comment, ProjectSummary } from '@brm/shared';
 import type { BridgeLike } from './bridge.ts';
 import { buildMcpServer } from './mcp.ts';
 
@@ -35,6 +35,17 @@ const comment: Comment = {
 
 const calls: { method: string; params: unknown }[] = [];
 
+const acme: ProjectSummary = {
+  id: 'p1',
+  name: 'acme-shop',
+  origin: 'https://staging.acme.com',
+  hubUrl: 'https://staging.acme.com/__margin/',
+  you: 'Andor',
+  lastPull: '2026-11-20T10:00:00.000Z',
+  lastError: null,
+};
+const feedback: Comment = { ...comment, id: 30, project: 'p1', remoteId: 4, messages: [{ ...comment.messages[0]!, name: 'Anna (client)' }] };
+
 /** Answers like the extension would. */
 const fake: BridgeLike = {
   async call<M extends BridgeMethod>(method: M, params: BridgeCalls[M]['params']) {
@@ -49,10 +60,28 @@ const fake: BridgeLike = {
       start_work: { ...comment, status: 'in_progress' },
       reply: comment,
       submit_solution: { ...comment, status: 'review_ready' },
+      projects: [acme],
+      pull: [{ project: 'acme-shop', added: 1, updated: 0, removed: 0, error: null }],
     };
+    if (method === 'list' && (params as { project?: string }).project) return [feedback] as BridgeCalls[M]['result'];
     return results[method];
   },
 };
+
+/** An extension from before projects: unknown calls answer undefined. */
+const oldExtension: BridgeLike = {
+  async call<M extends BridgeMethod>(method: M) {
+    return (method === 'list' ? [comment] : undefined) as BridgeCalls[M]['result'];
+  },
+};
+
+async function connect(bridge: BridgeLike, project: string | null = null): Promise<Client> {
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await buildMcpServer(bridge, '1.2.3', { project }).connect(b);
+  const c = new Client({ name: 'test', version: '0' });
+  await c.connect(a);
+  return c;
+}
 
 let client: Client;
 before(async () => {
@@ -69,13 +98,15 @@ async function tool(name: string, args: Record<string, unknown>) {
 }
 
 describe('MCP tools', () => {
-  it('lists the seven tools', async () => {
+  it('lists the nine tools', async () => {
     const { tools } = await client.listTools();
     assert.deepEqual(tools.map((t) => t.name).sort(), [
       'capture_screenshot',
       'get_comment',
       'get_screenshot',
       'list_comments',
+      'list_projects',
+      'pull_feedback',
       'reply',
       'start_work',
       'submit_solution',
@@ -114,4 +145,66 @@ describe('MCP tools', () => {
     assert.equal(res.isError, true);
     assert.match(res.content[0]!.text!, /does not exist/);
   });
+
+  it('list_comments with a project pulls it first and shows only its feedback', async () => {
+    calls.length = 0;
+    const { content } = await tool('list_comments', { project: 'acme-shop' });
+    assert.deepEqual(calls.map((c) => c.method), ['pull', 'list']);
+    assert.deepEqual(calls[1]!.params, { origin: undefined, statuses: ['open', 'in_progress'], project: 'acme-shop' });
+    assert.match(content[0]!.text!, /acme-shop: 1 new/);
+    assert.match(content[0]!.text!, /#30 .*\(customer feedback from Anna \(client\)\)/);
+  });
+
+  it('list_projects and pull_feedback', async () => {
+    assert.match((await tool('list_projects', {})).content[0]!.text!, /acme-shop: staging https:\/\/staging.acme.com/);
+    calls.length = 0;
+    assert.match((await tool('pull_feedback', {})).content[0]!.text!, /acme-shop: 1 new/);
+    assert.deepEqual(calls[0], { method: 'pull', params: {} });
+  });
+});
+
+describe('.margin/project.json', () => {
+  it('makes list_comments show that project by default, and "" shows everything', async () => {
+    const c = await connect(fake, 'acme-shop');
+    calls.length = 0;
+    await c.callTool({ name: 'list_comments', arguments: {} });
+    assert.deepEqual(calls.map((x) => x.method), ['pull', 'list']);
+    calls.length = 0;
+    await c.callTool({ name: 'list_comments', arguments: { project: '' } });
+    assert.deepEqual(calls.map((x) => x.method), ['list']);
+    calls.length = 0;
+    await c.callTool({ name: 'pull_feedback', arguments: {} });
+    assert.deepEqual(calls[0], { method: 'pull', params: { project: 'acme-shop' } });
+  });
+});
+
+describe('with an extension from before projects', () => {
+  it('says to update the extension instead of failing oddly', async () => {
+    const c = await connect(oldExtension);
+    for (const [name, args] of [
+      ['list_projects', {}],
+      ['pull_feedback', {}],
+      ['list_comments', { project: 'acme-shop' }],
+    ] as const) {
+      const res = await c.callTool({ name, arguments: args });
+      assert.equal(res.isError, true, name);
+      assert.match((res.content as Content[])[0]!.text!, /newer Margin extension/, name);
+    }
+    // Everything else works as before.
+    const res = await c.callTool({ name: 'list_comments', arguments: {} });
+    assert.notEqual(res.isError, true);
+  });
+
+describe('customer feedback updates', () => {
+  it('tell the agent the customer does not see them yet', async () => {
+    const queued: BridgeLike = {
+      async call<M extends BridgeMethod>(method: M) {
+        return { ...feedback, status: 'in_progress', outbox: [{ type: 'start_work' }] } as BridgeCalls[M]['result'];
+      },
+    };
+    const c = await connect(queued);
+    const res = await c.callTool({ name: 'start_work', arguments: { id: 30 } });
+    assert.match((res.content as Content[])[0]!.text!, /does not see this yet/);
+  });
+});
 });

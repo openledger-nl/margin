@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod';
-import { STATUSES, STATUS_LABELS, type ScreenshotKind } from '@brm/shared';
+import { STATUSES, STATUS_LABELS, type BridgeCalls, type Comment, type PullSummary, type ScreenshotKind } from '@brm/shared';
 import type { BridgeLike } from './bridge.ts';
 import { formatComment, formatListLine } from '@brm/shared';
 
@@ -38,10 +38,48 @@ const idSchema = z.number().int().positive().describe('Comment id, the number af
 const INSTRUCTIONS = `Review comments the user left on their dev app (localhost, a dev domain like *.test, or another site they turned on) with the Margin Browser Review extension.
 Each comment is a general page comment or pinned to one element, and is either a plain comment, a request to remove the element, or a request to edit it (text and CSS).
 Workflow: list_comments, then for each one get_comment, start_work, fix it in the source code, optionally capture_screenshot to check, then submit_solution with a short note on how you solved it.
-You can only set "in progress" and "review ready". The user accepts or reopens in the browser. Use reply to ask the user a question in the thread.`;
+You can only set "in progress" and "review ready". The user accepts or reopens in the browser. Use reply to ask the user a question in the thread.
+Customer feedback: the developer can add review-hub projects (customers commenting on a staging site) in the extension. list_projects shows them, pull_feedback gets new feedback, and list_comments with project shows one project's feedback. These comments work with the same tools, but your updates on them wait for the developer: they send them to the customer after deploying to staging, in their own words. Write your notes for the developer.`;
 
-export function buildMcpServer(bridge: BridgeLike, version: string): McpServer {
+export interface McpOptions {
+  /** From .margin/project.json in the folder the agent works in: list_comments shows this project's feedback by default. */
+  project?: string | null;
+}
+
+const UPDATE_EXTENSION = 'This needs a newer Margin extension (1.3 or later) that knows review-hub projects. Update the extension and try again.';
+
+/**
+ * A projects or pull call. Extensions from before projects answer undefined, or
+ * (newer ones) an error naming the method: both become "update the extension".
+ */
+async function projectCall<M extends 'projects' | 'pull'>(bridge: BridgeLike, method: M, params: BridgeCalls[M]['params']): Promise<BridgeCalls[M]['result']> {
+  let result: BridgeCalls[M]['result'] | undefined;
+  try {
+    result = await bridge.call(method, params);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes(`does not know "${method}"`)) throw new Error(UPDATE_EXTENSION);
+    throw err;
+  }
+  if (!Array.isArray(result)) throw new Error(UPDATE_EXTENSION);
+  return result;
+}
+
+/** On customer feedback the agent's updates wait for the developer to send them. */
+function unsent(c: Comment): string {
+  return c.outbox?.length
+    ? ' The customer does not see this yet: the developer sends it from the sidebar (Send to customer) after deploying to staging.'
+    : '';
+}
+
+function pullLine(s: PullSummary): string {
+  if (s.error) return `${s.project}: pull failed: ${s.error}`;
+  const parts = [s.added && `${s.added} new`, s.updated && `${s.updated} updated`, s.removed && `${s.removed} deleted`].filter(Boolean);
+  return `${s.project}: ${parts.length ? parts.join(', ') : 'nothing new'}`;
+}
+
+export function buildMcpServer(bridge: BridgeLike, version: string, options: McpOptions = {}): McpServer {
   const server = new McpServer({ name: 'browser-review', version }, { instructions: INSTRUCTIONS });
+  const defaultProject = options.project ?? null;
 
   server.registerTool(
     'list_comments',
@@ -54,17 +92,69 @@ export function buildMcpServer(bridge: BridgeLike, version: string): McpServer {
           .optional()
           .describe('Statuses to include. Default ["open", "in_progress"].'),
         origin: z.string().optional().describe('Only this site, for example "http://localhost:5173".'),
+        project: z
+          .string()
+          .optional()
+          .describe(
+            `Only customer feedback from this review-hub project (see list_projects); pulls it first.${defaultProject ? ` Default "${defaultProject}" (from .margin/project.json); "" for every comment.` : ''}`,
+          ),
       }),
     },
-    ({ status, origin }) =>
+    ({ status, origin, project }) =>
       guarded(async () => {
         const statuses = status?.length ? status : (['open', 'in_progress'] as const);
-        const list = await bridge.call('list', { origin, statuses: [...statuses] });
+        const name = project === undefined ? defaultProject : project || null;
+        let pulled = '';
+        if (name) {
+          // Fresh feedback first; when the hub is down the summary says so, and the last pulled copies still list.
+          const result = await projectCall(bridge, 'pull', { project: name });
+          pulled = `${result.map(pullLine).join('\n')}\n\n`;
+        }
+        const list = await bridge.call('list', { origin, statuses: [...statuses], ...(name ? { project: name } : {}) });
         const labels = statuses.map((s) => STATUS_LABELS[s].toLowerCase()).join(', ');
-        if (list.length === 0) return text(`No comments with status ${labels}.`);
+        const scope = name ? ` from ${name}` : '';
+        if (list.length === 0) return text(`${pulled}No comments${scope} with status ${labels}.`);
         return text(
-          `${list.length} comment(s) with status ${labels}:\n${list.map(formatListLine).join('\n')}\n\nUse get_comment for the details.`,
+          `${pulled}${list.length} comment(s)${scope} with status ${labels}:\n${list.map(formatListLine).join('\n')}\n\nUse get_comment for the details.`,
         );
+      }),
+  );
+
+  server.registerTool(
+    'list_projects',
+    {
+      description:
+        'List the review-hub projects added in the Margin extension: customer feedback on a staging site. Shows the staging site, when it was last pulled, and errors.',
+      inputSchema: z.object({}),
+    },
+    () =>
+      guarded(async () => {
+        const list = await projectCall(bridge, 'projects', {});
+        if (list.length === 0) {
+          return text('No review-hub projects. The developer adds one on the Margin extension\'s help page (Projects), with the hub URL and a developer token.');
+        }
+        const lines = list.map(
+          (p) =>
+            `- ${p.name}${p.name === defaultProject ? ' (this repo, from .margin/project.json)' : ''}: staging ${p.origin}, hub ${p.hubUrl}, ${p.lastPull ? `last pulled ${p.lastPull}` : 'not pulled yet'}${p.lastError ? `, last pull failed: ${p.lastError}` : ''}`,
+        );
+        return text(`${list.length} project(s):\n${lines.join('\n')}\n\nUse list_comments with project to see one project's feedback.`);
+      }),
+  );
+
+  server.registerTool(
+    'pull_feedback',
+    {
+      description: 'Get new customer feedback from the review hubs now (the extension also pulls every 5 minutes). One project, or all.',
+      inputSchema: z.object({
+        project: z.string().optional().describe(`Project name. Default: ${defaultProject ? `"${defaultProject}" (from .margin/project.json)` : 'all projects'}.`),
+      }),
+    },
+    ({ project }) =>
+      guarded(async () => {
+        const name = project ?? defaultProject ?? undefined;
+        const result = await projectCall(bridge, 'pull', name ? { project: name } : {});
+        if (result.length === 0) return text('No review-hub projects to pull. Add one on the Margin extension\'s help page (Projects).');
+        return text(`${result.map(pullLine).join('\n')}\n\nUse list_comments${name ? ` with project "${name}"` : ''} to see them.`);
       }),
   );
 
@@ -144,7 +234,7 @@ export function buildMcpServer(bridge: BridgeLike, version: string): McpServer {
     ({ id }) =>
       guarded(async () => {
         const c = await bridge.call('start_work', { id });
-        return text(`#${c.id} is now ${STATUS_LABELS[c.status].toLowerCase()}.`);
+        return text(`#${c.id} is now ${STATUS_LABELS[c.status].toLowerCase()}.${unsent(c)}`);
       }),
   );
 
@@ -158,7 +248,7 @@ export function buildMcpServer(bridge: BridgeLike, version: string): McpServer {
     ({ id, message }) =>
       guarded(async () => {
         const c = await bridge.call('reply', { id, message });
-        return text(`Reply added to #${c.id}.`);
+        return text(`Reply added to #${c.id}.${unsent(c)}`);
       }),
   );
 
@@ -176,7 +266,7 @@ export function buildMcpServer(bridge: BridgeLike, version: string): McpServer {
     ({ id, note, files }) =>
       guarded(async () => {
         const c = await bridge.call('submit_solution', { id, note, files: files ?? [] });
-        return text(`#${c.id} is now review ready. The user will accept or reopen it.`);
+        return text(`#${c.id} is now review ready.${unsent(c) || ' The user will accept or reopen it.'}`);
       }),
   );
 

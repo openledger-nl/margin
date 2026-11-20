@@ -8,6 +8,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { DEFAULT_PORT, MCP_ADD_COMMAND, MCP_ADD_COMMAND_CODEX } from '@brm/shared';
 import { Bridge } from './bridge.ts';
 import { buildMcpServer } from './mcp.ts';
+import { PROJECT_FILE, readProjectFile } from './project-file.ts';
 
 /** From package.json, which scripts/version.ts keeps in step with the root version. */
 const VERSION: string = (
@@ -29,6 +30,10 @@ starts it over stdio; you don't run it yourself. Add it to your agent once:
   Codex:        ${MCP_ADD_COMMAND_CODEX}
   Other agents: command "npx", args ["-y", "browser-review-mcp@latest"]
 
+Customer feedback from a margin review hub: add the project in the extension,
+and put { "project": "<name>" } in .margin/project.json in your repo so
+list_comments shows that project's feedback.
+
 Environment: BRM_PORT (default ${DEFAULT_PORT}, the extension expects ${DEFAULT_PORT}).`);
   process.exit(0);
 }
@@ -43,7 +48,15 @@ const log = (msg: string) => console.error(`[browser-review] ${msg}`);
 const bridge = new Bridge({ port, version: VERSION, log });
 void bridge.start(); // in the background: Claude Code must get its answer to "initialize" right away
 
-const server = buildMcpServer(bridge, VERSION);
+// Which review-hub project this repo belongs to, if any (the agent starts us in the repo).
+let project: string | null = null;
+try {
+  project = readProjectFile(process.cwd());
+  if (project) log(`project "${project}" from ${PROJECT_FILE}`);
+} catch (err) {
+  log(err instanceof Error ? err.message : String(err));
+}
+const server = buildMcpServer(bridge, VERSION, { project });
 const transport = new StdioServerTransport();
 
 let stopping = false;
