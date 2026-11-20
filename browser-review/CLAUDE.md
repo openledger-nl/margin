@@ -9,7 +9,8 @@ over MCP. See README.md for how it works and how to use it.
 
 ```
 shared/      types used by every side, including the bridge protocol (BridgeCalls),
-             the comment rules (rules.ts), the Store (store.ts) and formatComment
+             the comment rules (rules.ts), the Store (store.ts), formatComment, the site
+             map (site-map.ts) and a company's brand colors with contrast (theme.ts)
 server/      browser-review-mcp, published to npm: MCP over stdio + WebSocket bridge
 hub/         margin review hub, a Docker image: customers comment on a staging site
              with a review token, developers pull with a developer token. The shared

@@ -220,7 +220,7 @@ of flaws is in [demo/README.md](demo/README.md); `git checkout demo/` resets it.
 | Make the comments sidebar wider or narrower | drag its edge; the browser remembers the width |
 | Comment on the page | **Page comment** (Alt+Shift+C) |
 | See all feedback on a map of the site | **Overview** in the sidebar: every page you opened, with its comments by status. **Export PDF** saves it |
-| See all comments | **Comments** (Alt+C, opens and closes them): this page or the whole site. **Show** picks the status: not accepted yet (open, in progress and review ready together), one status, or all. Each comment has a colored stripe for its status: blue open, amber in progress, purple review ready, green accepted. Comments start collapsed, as an overview: click one to open it. **Expand all** opens them all (remembered), **Collapse all** goes back. The browser may refuse to open its side panel from the **Comments** button or a pin (it only allows that from its own controls); the toolbar then says to use the extension icon or Alt+C. Once open, pins and **Show in sidebar** show their comment in it |
+| See all comments | **Comments** (Alt+C, opens and closes them): the whole site, with the page each one is on; **This page** narrows it down. The count on the button is for the whole site too. **Show** picks the status: not accepted yet (open, in progress and review ready together), one status, or all. Each comment has a colored stripe for its status: blue open, amber in progress, purple review ready, green accepted. Comments start collapsed, as an overview: click one to open it. **Expand all** opens them all (remembered), **Collapse all** goes back. The browser may refuse to open its side panel from the **Comments** button or a pin (it only allows that from its own controls); the toolbar then says to use the extension icon or Alt+C. Once open, pins and **Show in sidebar** show their comment in it |
 | Jump to a comment's element | **Go to** in the comment. On another page it opens that page first. If the element is gone, you land on the page. **Open page** always opens the page itself. |
 | Help | **?** in the toolbar or the sidebar |
 | Change the shortcuts | they are browser shortcuts: help page, **Change shortcuts** (`brave://extensions/shortcuts`; Firefox: about:addons, gear, Manage Extension Shortcuts) |
@@ -407,14 +407,35 @@ docker compose exec margin margin token revoke "Anna (client)"
   goes to a third party.
 
 **The customer** opens their link and is welcomed by name ("Hi Milan!", from the
-token's name), with the three steps and their keys. Then the same toolbar you know,
-in the Margin colors: pick an element and comment on it or ask to remove it, or
-comment on the whole page, with a screenshot each time (customers can't edit text
-or CSS). **Alt+C** opens and closes their comments, where they see your replies and
-accept or reopen. **Overview** shows every page they looked at with what they said
-where, and **Export PDF** saves it all. The link only works on your staging site;
-the toolbar's ✕ hides it and **Feedback** brings it back. Change the welcome text
-with `MARGIN_WELCOME` (use `{name}` for theirs).
+token's name): the pages you asked them to look at, and the four steps with a small
+animation each and their keys. Then the same toolbar you know: pick an element and
+comment on it or ask to remove it, or comment on the whole page, with a screenshot
+each time (customers can't edit text or CSS). **Alt+C** opens and closes their
+comments, where they see your replies and accept or reopen. **Overview** in the
+toolbar shows every page they looked at with what they said where, and the focus
+pages; it updates by itself, so they can keep it on a second screen while they
+browse. **Export PDF** saves it all. The link only works on your staging site; the
+toolbar's ✕ hides it and **Feedback** brings it back. Change the welcome text with
+`MARGIN_WELCOME` (use `{name}` for theirs).
+
+**Private by default:** each customer sees only their own comments and visits. You
+see everything. To make it one shared review, or to let one person (a project lead)
+see everyone's feedback, use **Review settings** (below). Even then their comments,
+the count and the overview start with their own feedback; **Show all other feedback**
+adds everyone else's.
+
+**Your own logo and colors:** put `brand.json` and a `logo.svg` or `logo.png` in the
+hub's data folder, and customers see your name, logo and colors in the toolbar, the
+welcome, the overview and its PDF:
+
+```json
+{ "name": "Acme", "color": "#e4572e", "toolbar": "#1b1f3b" }
+```
+
+`color` is for buttons and links, `toolbar` for the toolbar. Text colors follow
+by themselves so it stays readable; the status colors stay the same. The hub picks
+up changes without a restart; `margin brand check` says what's wrong. Your own
+extension keeps the Margin look. Details: [hub/README.md](hub/README.md#your-own-look).
 
 **You** add the project once on the extension's help page (**Customer feedback
 from staging**): the hub URL and your developer token. The extension pulls every 5
@@ -443,8 +464,20 @@ comment files per page.
 
 **Overview** (in the sidebar, for your own sites too) opens the feedback overview:
 the site as a tree of pages, with the feedback per page by status, who visited it,
-and the pages that were looked at without feedback. Filter by person and status;
-**Export PDF** opens the print dialog (Save as PDF).
+and the pages that were looked at without feedback. Click a page to open it (from a
+customer's overview it opens in their site tab). Pages you opened in this session
+(until a 30-minute break) are marked **✓ Visited this session**, the one you're on
+**Here now**. Filter by person and status; **Export PDF** opens the print dialog
+(Save as PDF).
+
+**Review settings** (at the top of a project's overview) is where you steer the review:
+- **Focus pages**: the pages customers should look at, with a note ("check the
+  prices"). Add them there, or click ★ on a page in the map. Customers see them in
+  their welcome and overview (★ 1 of 3 focus pages visited).
+- **Who sees what**: *Customers see each other's feedback* (off by default), and per
+  customer *Everyone's feedback* or *Only their own*.
+
+Both are saved on the hub (`review.json`) right away.
 
 Setup, the nginx rule, the API and where each file lives:
 [hub/README.md](hub/README.md). Try it locally with the demo: [Development](#development).

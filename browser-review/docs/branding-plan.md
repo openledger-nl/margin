@@ -1,5 +1,7 @@
 # Your own logo and colors on the customer side
 
+> **Status:** built, with the animated welcome, the Overview button in the toolbar, focus pages, private-by-default feedback (`review.json`, set from the extension's project overview) and a live overview for a second screen. See the README and hub/README.
+
 ## What it is
 
 A company (or agency) that runs the margin review hub can show its own logo and

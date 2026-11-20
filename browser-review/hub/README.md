@@ -93,6 +93,8 @@ docker compose exec margin margin token revoke "Anna (client)"
   tokens.json            token names and hashes (written by the CLI only)
   site-map.md            every page reviewers opened, who looked, and its comments
   visits.json            the page visits behind it
+  review.json            focus pages and who sees whose feedback (set from the extension)
+  brand.json, logo.svg   your own look on the customer side (optional, you write them)
   token-usage.json, counters.json, deletions.json
 ```
 
@@ -100,6 +102,47 @@ The Markdown is what an agent gets from `get_comment`, with frontmatter
 (status, page, reviewers) and links to the images. Back up the volume like any
 other data. It is never served by the web server: the hub only hands out data
 to valid tokens.
+
+## Your own look
+
+Customers see your name, logo and colors instead of Margin's: in the toolbar, the
+Feedback button, the welcome, the comments, the overview and its PDF, and `/help`.
+Put these in the data folder (next to `tokens.json`):
+
+```json
+// brand.json, every field optional
+{
+  "name": "Acme",          // instead of "Margin": "Acme feedback", the welcome; 1 to 40 characters
+  "color": "#e4572e",      // buttons, links, focus rings, the selected tool
+  "toolbar": "#1b1f3b"     // the toolbar and the Feedback button
+}
+```
+
+(No comments in the real file: see `brand.example.json`.)
+
+- **Logo**: `logo.svg` or `logo.png`, square works best, at most 200 KB
+  (`logo.example.svg` is a sample).
+- Text on your colors is white or near-black, whichever reads better; a color too
+  light for text on white is darkened for links. The status colors (open, in
+  progress, review ready, accepted) never change.
+- Changes are picked up by themselves, no restart. A broken file is ignored (the
+  Margin look stays) and logged.
+- `docker compose exec margin margin brand check` shows what the hub found and what
+  is wrong.
+- The overview and `/help` keep one line, *Powered by Margin*, linking to the Margin repo.
+- The developer's extension keeps the Margin look.
+
+## Focus pages and who sees what
+
+Set from the Margin extension (**Review settings** in a project's overview) and kept in
+`review.json`:
+
+- **Focus pages**: the pages customers are asked to look at, each with an optional
+  note. They show in the customer's welcome and overview, and in `site-map.md`.
+- **Who sees what**: by default each customer sees only their own comments,
+  screenshots and visits; someone else's comment is a 404 for them. `share: true`
+  makes it one shared review; `shareFor` sets it per customer (by token name).
+  Developers always see everything.
 
 ## Environment
 
@@ -116,10 +159,10 @@ to valid tokens.
 
 | | Token | |
 |---|---|---|
-| `GET /api/review/me` | review | `{ name, project, welcome }`: whose link this is |
+| `GET /api/review/me` | review | `{ name, project, welcome, share, focusPages }`: whose link this is, and what they see |
 | `POST /api/review/visits` `{ url, title }` | review | A page the customer opened (path and title only) |
 | `GET /api/review/visits`, `GET /api/dev/visits` | review, developer | `{ visits }`: who looked at which page |
-| `GET /api/review/comments` | review | All comments of the project |
+| `GET /api/review/comments` | review | Their own comments, or all of the project when they share |
 | `POST /api/review/comments` | review | New comment (`CreateCommentInput`, up to 15 MB with screenshots) |
 | `GET /api/review/comments/:id` | review | One comment |
 | `POST /api/review/comments/:id/reply` `{ body }` | review | |
@@ -134,6 +177,9 @@ to valid tokens.
 | `POST /api/dev/comments/:id/reply` `{ message }` | developer | |
 | `POST /api/dev/comments/:id/submit_solution` `{ note, files? }` | developer | |
 | `GET /api/dev/screenshots/:id` | developer | `{ dataUrl }` |
+| `GET /api/dev/settings`, `PUT` or `POST` `{ focusPages, share, shareFor }` | developer | Focus pages and who sees whose feedback |
+| `GET /api/dev/reviewers` | developer | `{ reviewers }`: the customers' names and when they last used their link |
+| `GET /brand.json`, `GET /brand/logo` | – | Your look: `{ name, color, toolbar, logo }` and the logo file (public: it is what anyone on staging sees anyway) |
 | `GET /margin.js`, `/margin-<version>.js` | – | The customer toolbar; `margin sri` prints a pinned tag with integrity |
 | `GET /overview` | – | The customer's feedback overview with a site map and PDF export (its script reads the token from the staging site) |
 | `GET /help`, `/healthz` | – | |
