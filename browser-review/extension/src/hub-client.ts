@@ -1,6 +1,11 @@
 // Talks to a margin review hub's developer API (/api/dev/*) with a developer
 // token. Only the background worker uses it: the token never reaches a page.
-import type { Comment, PageVisit } from '@brm/shared';
+import type { Comment, PageVisit, ReviewSettings } from '@brm/shared';
+
+export interface HubReviewer {
+  name: string;
+  lastUsed: string | null;
+}
 
 export interface HubProject {
   name: string;
@@ -81,6 +86,20 @@ export class HubClient {
   }
 
   /** Every reviewer's page visits (the site map in the overview). */
+  /** Focus pages and who sees whose feedback (review.json on the hub). */
+  settings(): Promise<ReviewSettings> {
+    return this.#call('GET', 'settings');
+  }
+
+  saveSettings(settings: ReviewSettings): Promise<ReviewSettings> {
+    return this.#call('POST', 'settings', settings);
+  }
+
+  /** The customers with a review link (names only). Older hubs: none. */
+  async reviewers(): Promise<HubReviewer[]> {
+    return (await this.#call<{ reviewers: HubReviewer[] }>('GET', 'reviewers')).reviewers;
+  }
+
   async visits(): Promise<PageVisit[]> {
     return (await this.#call<{ visits: PageVisit[] }>('GET', 'visits')).visits;
   }

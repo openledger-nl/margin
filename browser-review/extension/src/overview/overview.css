@@ -88,6 +88,7 @@ select {
 }
 
 .ov-tools select,
+.ov-people select,
 .ov-filters select {
   appearance: none;
   -webkit-appearance: none;
@@ -104,11 +105,13 @@ select {
 }
 
 .ov-tools select:hover,
+.ov-people select:hover,
 .ov-filters select:hover {
   border-color: #cfc9ba;
 }
 
 .ov-tools select:focus,
+.ov-people select:focus,
 .ov-filters select:focus {
   outline: none;
   border-color: var(--accent);
@@ -136,7 +139,7 @@ select {
 .ov-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent, #fff);
 }
 
 .ov-primary:hover {
@@ -229,11 +232,11 @@ select {
   cursor: pointer;
 }
 
-.ov-row:disabled {
+.ov-page:not(:has(.ov-comments)) > .ov-row {
   cursor: default;
 }
 
-.ov-row:hover:not(:disabled) {
+.ov-row:hover {
   background: var(--paper);
 }
 
@@ -247,12 +250,48 @@ select {
 }
 
 .ov-caret {
+  width: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ov-caret:disabled {
+  cursor: default;
 }
 
 .ov-path {
+  color: inherit;
   font: 13px ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+.ov-path:hover,
+.ov-path:focus-visible {
+  color: var(--accent-strong);
+  text-decoration-color: currentColor;
+}
+
+.ov-seen {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accepted-soft);
+  color: #1f7a50;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ov-session-stat {
+  border-color: #b9e2cc;
+  background: var(--accepted-soft);
 }
 
 .ov-page-title {
@@ -437,7 +476,272 @@ select {
 }
 
 /* Export PDF: the browser's print dialog, "Save as PDF". */
+/* ---------- Live, focus pages, here now, the company logo ---------- */
+.ov-logo {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  object-fit: contain;
+}
+
+.ov-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  color: var(--dim);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: ov-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ov-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+button.ov-stat {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ov-focus-stat {
+  border-color: #e7c66b;
+  background: #fff8e1;
+}
+
+.ov-focus-stat.is-active {
+  border-color: #b8860b;
+  box-shadow: 0 0 0 2px #f3dc95;
+}
+
+.ov-focus {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #fff3cd;
+  color: #7a5a00;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ov-page.is-focus > .ov-row {
+  box-shadow: inset 3px 0 0 #e0b232;
+}
+
+.ov-here {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent, #fff);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ov-page.is-here > .ov-row {
+  background: var(--accent-soft);
+}
+
+.ov-tag.ov-todo {
+  border-color: #e0b232;
+  color: #7a5a00;
+}
+
+.ov-private {
+  margin: 0 0 10px;
+}
+
+.ov-foot a {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ov-live i {
+    animation: none;
+  }
+}
+
+/* ---------- The developer's review settings (extension) ---------- */
+.ov-page {
+  position: relative;
+}
+
+.ov-star {
+  position: absolute;
+  z-index: 1;
+  right: 4px;
+  top: 8px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #cfc9ba;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.ov-star:hover {
+  background: var(--paper);
+  color: #b8860b;
+}
+
+.ov-star.is-on {
+  color: #e0b232;
+}
+
+.ov-page:has(.ov-star) > .ov-row {
+  padding-right: 36px;
+}
+
+.ov-settings {
+  margin: 18px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.ov-settings h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.ov-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px 24px;
+}
+
+.ov-settings h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+}
+
+.ov-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ov-switch input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.ov-people {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ov-people li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+}
+
+.ov-people select,
+.ov-focus-add input {
+  font: inherit;
+}
+
+.ov-focus-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.ov-focus-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+}
+
+.ov-focus-list code {
+  font-weight: 600;
+}
+
+.ov-focus-list .ov-x {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.ov-focus-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ov-focus-add input {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.ov-focus-add input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.ov-saved {
+  margin-left: 8px;
+  color: var(--accent-strong);
+  font-size: 13px;
+}
+
+.ov-whose {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
 @media print {
+  .ov-whose {
+    display: none;
+  }
+
+  .ov-settings,
+  .ov-star {
+    display: none;
+  }
+  .ov-live,
+  .ov-here {
+    display: none;
+  }
+  .ov-page.is-here > .ov-row {
+    background: none;
+  }
+  .ov-path {
+    text-decoration: none;
+  }
   body {
     background: #fff;
     font-size: 12px;

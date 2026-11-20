@@ -43,13 +43,15 @@ import {
   type SiteSettings,
 } from './sites.ts';
 import { IdbDb } from './idb.ts';
-import { Store, mergeVisit, type PageVisit, type PullSummary, type SendDecision } from '@brm/shared';
+import { Store, leaveSession, mergeVisit, touchSession, type PageVisit, type PullSummary, type SendDecision } from '@brm/shared';
 import { cropToPng } from './crop.ts';
 import {
   PROJECTS_KEY,
   VISITS_KEY,
   projectVisitsKey,
   checkProject,
+  defaultClient,
+  sessionKey,
   hubErrorMessage,
   pullProject,
   pushToHub,
@@ -190,6 +192,12 @@ async function handleCall(method: BridgeMethod, params: unknown): Promise<unknow
 // ---------- review-hub projects (sync.ts) ----------
 
 let projectsQueue: Promise<unknown> = Promise.resolve();
+
+async function projectById(id: string): Promise<Project> {
+  const p = (await readProjects()).find((x) => x.id === id);
+  if (!p) throw new Error('This project is not in the extension anymore.');
+  return p;
+}
 
 async function readProjects(): Promise<Project[]> {
   return toProjects((await chrome.storage.local.get(PROJECTS_KEY))[PROJECTS_KEY]);
@@ -341,6 +349,22 @@ function recordVisit(url: string, title: string): Promise<void> {
   return run;
 }
 
+/** This browser session's pages and the one open now, per site, for the overview. Gone when the browser closes. */
+let sessionQueue: Promise<void> = Promise.resolve();
+function markPage(url: string | null, origin: string): void {
+  sessionQueue = sessionQueue
+    .then(async () => {
+      if (!chrome.storage.session) return;
+      await siteSettingsReady;
+      if (url && !isAllowed(url, siteSettings)) return;
+      const key = sessionKey(url ? pageKey(url).origin : origin);
+      const old = (await chrome.storage.session.get(key))[key];
+      const next = url ? touchSession(old, pageKey(url).path) : leaveSession(old);
+      if (next) await chrome.storage.session.set({ [key]: next });
+    })
+    .catch(() => {});
+}
+
 // ---------- help page ----------
 
 function openHelp(section?: string): void {
@@ -399,6 +423,10 @@ chrome.runtime.onMessage.addListener((req: ContentRequest, sender, sendResponse)
   }
   if (req.type === 'visit') {
     void recordVisit(req.url, req.title);
+    return false;
+  }
+  if (req.type === 'page') {
+    markPage(req.url, req.origin);
     return false;
   }
   if (req.type === 'open-overview') {
@@ -567,6 +595,25 @@ async function runStoreOp(op: keyof StoreOps, args: unknown): Promise<unknown> {
     case 'discard': {
       const c = await store.discardOutbox(a('discard').id);
       return changed(c);
+    }
+    case 'reviewSettings': {
+      const p = await projectById(a('reviewSettings').project);
+      const client = defaultClient(p);
+      try {
+        const [settings, reviewers] = await Promise.all([client.settings(), client.reviewers()]);
+        return { settings, reviewers };
+      } catch (err) {
+        throw new Error(hubErrorMessage(p, err));
+      }
+    }
+    case 'saveReviewSettings': {
+      const { project, settings } = a('saveReviewSettings');
+      const p = await projectById(project);
+      try {
+        return await defaultClient(p).saveSettings(settings);
+      } catch (err) {
+        throw new Error(hubErrorMessage(p, err));
+      }
     }
   }
 }

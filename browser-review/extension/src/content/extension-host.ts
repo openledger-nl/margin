@@ -62,6 +62,8 @@ async function capture(rect: Rect | null): Promise<ScreenshotUpload | undefined>
 }
 
 /** portName: "brm" for the overlay, "brm-panel:<windowId>" for the side panel. */
+let leaveHooked = false;
+
 export function createExtensionHost(opts: { portName?: string } = {}): Host {
   const portName = opts.portName ?? 'brm';
   return {
@@ -166,6 +168,13 @@ export function createExtensionHost(opts: { portName?: string } = {}): Host {
     openHelp: (section) => void sendMessage({ type: 'open-help', section }).catch(() => {}),
     openOverview: (target) => void sendMessage({ type: 'open-overview', ...target }).catch(() => {}),
     recordVisit: (url, title) => void sendMessage({ type: 'visit', url, title }).catch(() => {}),
+    markPage: (url) => {
+      void sendMessage({ type: 'page', url, origin: location.origin }).catch(() => {});
+      if (!leaveHooked) {
+        leaveHooked = true;
+        addEventListener('pagehide', () => void sendMessage({ type: 'page', url: null, origin: location.origin }).catch(() => {}));
+      }
+    },
 
     alive,
   };

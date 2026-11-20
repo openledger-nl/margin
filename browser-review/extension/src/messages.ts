@@ -1,5 +1,6 @@
 // Messages between the content script / extension pages and the background service worker.
-import type { Comment, CreateCommentInput, PageVisit, ProjectSummary, PullSummary, Rect, SendDecision, TargetInfo, Viewport } from '@brm/shared';
+import type { Comment, CreateCommentInput, PageVisit, ProjectSummary, PullSummary, Rect, ReviewSettings, SendDecision, TargetInfo, Viewport } from '@brm/shared';
+import type { HubReviewer } from './hub-client.ts';
 
 /** Store operations the overlay can ask the background for. */
 export interface StoreOps {
@@ -23,6 +24,9 @@ export interface StoreOps {
   discard: { args: { id: number }; result: Comment };
   /** Page visits: one site (origin), or one project's (pulled from its hub). */
   visits: { args: { origin?: string; project?: string }; result: PageVisit[] };
+  /** A project's review settings and its customers, from the hub. */
+  reviewSettings: { args: { project: string }; result: { settings: ReviewSettings; reviewers: HubReviewer[] } };
+  saveReviewSettings: { args: { project: string; settings: ReviewSettings }; result: ReviewSettings };
 }
 
 export interface SendResult {
@@ -40,6 +44,8 @@ export type ContentRequest =
   | { type: 'open-help'; section?: string }
   /** The overlay opened a page (load or SPA navigation): remember it for the overview's site map. */
   | { type: 'visit'; url: string; title: string }
+  /** The page open now (url), or leaving it (url null, with the origin). */
+  | { type: 'page'; url: string | null; origin: string }
   /** Open the overview page for a site or a project. */
   | { type: 'open-overview'; origin?: string; project?: string }
   | { type: 'status' }

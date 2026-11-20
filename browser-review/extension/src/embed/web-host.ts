@@ -1,6 +1,9 @@
 // The Host in margin.js on a staging site: the margin review hub owns the data,
 // settings are in localStorage, and there is no background or side panel.
-import type { Comment, CreateCommentInput, Rect, ScreenshotUpload } from '@brm/shared';
+import { leaveSession, pageKey, touchSession, type Brand, type Comment, type CreateCommentInput, type FocusPage, type Rect, type ScreenshotUpload } from '@brm/shared';
+
+/** This session's pages, read by the hub's overview on the same origin. */
+export const SESSION_KEY = 'margin:session';
 import type { PortEvent, TabRequest } from '../messages.ts';
 import type { Host } from '../content/host.ts';
 
@@ -43,6 +46,9 @@ export function createWebHost(opts: WebHostOptions): WebHost {
   let me: string | null = null;
   let welcome: string | null = null;
   let project: string | null = null;
+  let brand: Brand | null = null;
+  let focusPages: FocusPage[] = [];
+  let share = false;
   /** Path -> last time sent, so a page is sent at most once a minute. */
   const visitSent = new Map<string, number>();
   let connected = false;
@@ -110,13 +116,34 @@ export function createWebHost(opts: WebHostOptions): WebHost {
     get project() {
       return project;
     },
+    get brand() {
+      return brand;
+    },
+    get focusPages() {
+      return focusPages;
+    },
+    get share() {
+      return share;
+    },
 
     async start() {
+      // The look first: public, so the toolbar can wear it even when the token fails.
       try {
-        const who = await call<{ name: string; project?: string; welcome?: string | null }>('GET', 'me');
+        const res = await doFetch(new URL('brand.json', opts.hubUrl), { credentials: 'omit', cache: 'no-cache' });
+        if (res.ok) {
+          const b = (await res.json()) as Brand;
+          brand = { ...b, logo: b.logo ? new URL(b.logo, opts.hubUrl).href : null };
+        }
+      } catch {
+        // an older hub, or offline: the Margin look
+      }
+      try {
+        const who = await call<{ name: string; project?: string; welcome?: string | null; share?: boolean; focusPages?: FocusPage[] }>('GET', 'me');
         me = who.name;
         welcome = who.welcome ?? null;
         project = who.project ?? null;
+        share = who.share === true;
+        focusPages = who.focusPages ?? [];
         return 'ok';
       } catch (err) {
         return err instanceof Unauthorized ? 'unauthorized' : 'offline';
@@ -226,8 +253,14 @@ export function createWebHost(opts: WebHostOptions): WebHost {
     },
 
     // The hub's overview page, on this site's origin, reads the token from localStorage.
+    // Not noopener: its page links open in this tab (it is our own page, same origin).
     openOverview() {
-      window.open(new URL('overview', opts.hubUrl), '_blank', 'noopener');
+      window.open(new URL('overview', opts.hubUrl), '_blank');
+    },
+
+    // This session's pages and the one open now, for the overview: in this browser only.
+    markPage(url) {
+      updateSession((s) => touchSession(s, pageKey(url).path));
     },
 
     recordVisit(url, title) {
@@ -241,6 +274,18 @@ export function createWebHost(opts: WebHostOptions): WebHost {
     alive: () => true,
   };
 }
+
+function updateSession(fn: (stored: unknown) => unknown): void {
+  try {
+    const next = fn(JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null'));
+    if (next) localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+  } catch {
+    // storage blocked: no session marks
+  }
+}
+
+// Tab closed or off to another site: no "Here now" any more (the next page sets it again).
+addEventListener('pagehide', () => updateSession((s) => leaveSession(s)));
 
 /** Typing in a field: Option+C on a Mac is "ç", not a shortcut. */
 function inField(e: KeyboardEvent): boolean {

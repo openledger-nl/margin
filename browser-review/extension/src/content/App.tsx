@@ -12,7 +12,7 @@ import { Composer } from './ui/Composer.tsx';
 import { Picker } from './ui/Picker.tsx';
 import { Outline, Pins } from './ui/Pins.tsx';
 import { Sidebar } from './ui/Sidebar.tsx';
-import { Mark } from './ui/Mark.tsx';
+import { BrandMark } from './ui/BrandMark.tsx';
 import { Welcome } from './ui/Welcome.tsx';
 import { Toolbar } from './ui/Toolbar.tsx';
 
@@ -75,6 +75,9 @@ export function App({ previews }: { previews: Previews }) {
       .catch(() => {});
   }, [host, review]);
 
+  // Where you are now, right away (the overview's "Here now" follows it).
+  useEffect(() => host.markPage?.(location.href), [host, href]);
+
   // Every page opened with the toolbar on, for the overview's site map (after the title settles).
   useEffect(() => {
     const t = setTimeout(() => host.recordVisit?.(location.href, document.title), 800);
@@ -102,7 +105,18 @@ export function App({ previews }: { previews: Previews }) {
     });
   }, [host, origin, load]);
 
-  const pageComments = useMemo(() => comments.filter((c) => c.path === path), [comments, path]);
+  // Customers start with their own feedback; "Show all other feedback" adds everyone's
+  // (only there when the team lets them see it). The developer always sees everything.
+  const [showOthers, setShowOthers] = useState(false);
+  const isOwn = (c: Comment) => c.messages[0]?.author === 'user' && c.messages[0].name === host.me;
+  const othersCount = review ? comments.filter((c) => !isOwn(c)).length : 0;
+  const listed = useMemo(() => (review && !showOthers ? comments.filter(isOwn) : comments), [comments, review, showOthers, host.me]);
+  // Opened on someone else's comment (an overview link): show everyone's.
+  useEffect(() => {
+    if (focusId !== null && review && comments.some((c) => c.id === focusId && !isOwn(c))) setShowOthers(true);
+  }, [focusId, comments]);
+
+  const pageComments = useMemo(() => listed.filter((c) => c.path === path), [listed, path]);
 
   // Previews run even when the overlay is hidden: removed stays removed.
   useEffect(() => {
@@ -389,7 +403,7 @@ export function App({ previews }: { previews: Previews }) {
     if (host.mode !== 'review') return null;
     return (
       <button class="brm-ui brm-launcher" onClick={() => setHiddenStored(false)} title="Show the feedback toolbar (Alt+Shift+R)">
-        <Mark />
+        <BrandMark />
         Feedback
       </button>
     );
@@ -397,15 +411,19 @@ export function App({ previews }: { previews: Previews }) {
 
   const pinned = pageComments.filter((c) => c.target && c.status !== 'accepted' && !isPreviewActiveRemove(c));
   const outlined = pageComments.find((c) => c.id === (flashId ?? hoverId));
-  const openCount = pageComments.filter((c) => c.status === 'open' || c.status === 'in_progress').length;
-  const reviewCount = pageComments.filter((c) => c.status === 'review_ready').length;
+  // The toolbar counts the whole site, like the sidebar shows it.
+  const openCount = listed.filter((c) => c.status === 'open' || c.status === 'in_progress').length;
+  const reviewCount = listed.filter((c) => c.status === 'review_ready').length;
 
   return (
     <>
       {/* Sidebar first: popovers, pins and the picker render on top of it. */}
       {!usePanel && panel !== null && sidebarOpen && (
         <Sidebar
-          comments={comments}
+          comments={listed}
+          othersCount={othersCount}
+          showOthers={showOthers}
+          onShowOthers={setShowOthers}
           path={path}
           origin={origin}
           connected={connected}
@@ -458,6 +476,7 @@ export function App({ previews }: { previews: Previews }) {
         onToggleSidebar={toggleThreads}
         onHide={() => setHiddenStored(true)}
         onHelp={() => (review ? setShowWelcome(true) : host.openHelp())}
+        onOverview={review && host.openOverview ? () => host.openOverview?.({}) : undefined}
       />
       {showWelcome && (
         <Welcome

@@ -85,7 +85,7 @@ textarea {
 }
 
 textarea:focus {
-  border-color: var(--brm-accent);
+  border-color: var(--brm-accent-text, var(--brm-accent));
   box-shadow: 0 0 0 3px var(--brm-accent-soft);
 }
 
@@ -123,8 +123,8 @@ code {
 
 .brm-btn.brm-primary {
   background: var(--brm-accent);
-  border-color: var(--brm-accent);
-  color: #fff;
+  border-color: var(--brm-accent-text, var(--brm-accent));
+  color: var(--brm-on-accent, #fff);
 }
 
 .brm-btn.brm-primary:hover:not(:disabled) {
@@ -173,7 +173,7 @@ code {
 
 .brm-check input {
   margin: 0;
-  accent-color: var(--brm-accent);
+  accent-color: var(--brm-accent-text, var(--brm-accent));
 }
 
 .brm-actions > .brm-dim {
@@ -198,7 +198,7 @@ code {
   font-size: 14px;
   /* The Margin "screen": dark, so it stands out on any page. */
   background: var(--brm-screen);
-  color: #fff;
+  color: var(--brm-on-screen, #fff);
   border: 1px solid var(--brm-screen-2);
   border-radius: 12px;
   box-shadow: var(--brm-shadow);
@@ -252,11 +252,11 @@ code {
 }
 
 .brm-tool:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: color-mix(in srgb, var(--brm-on-screen, #fff) 10%, transparent);
 }
 
 .brm-tool.is-active {
-  background: rgba(76, 195, 138, 0.18);
+  background: color-mix(in srgb, var(--brm-prompt) 18%, transparent);
   color: var(--brm-prompt);
 }
 
@@ -314,12 +314,12 @@ code {
   width: 40px;
   height: 40px;
   font-size: 15px;
-  color: var(--brm-code);
+  color: var(--brm-on-screen-dim, var(--brm-code));
 }
 
 .brm-toolbar .brm-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.09);
-  color: #fff;
+  background: color-mix(in srgb, var(--brm-on-screen, #fff) 10%, transparent);
+  color: var(--brm-on-screen, #fff);
 }
 
 .brm-toolbar .brm-count {
@@ -341,7 +341,7 @@ code {
 }
 
 .brm-highlight {
-  background: rgba(47, 158, 107, 0.14);
+  background: color-mix(in srgb, var(--brm-accent) 14%, transparent);
   outline: 2px solid var(--brm-accent);
 }
 
@@ -558,7 +558,7 @@ code {
 }
 
 .brm-warn a {
-  color: var(--brm-accent);
+  color: var(--brm-accent-text, var(--brm-accent));
   font-weight: 500;
 }
 
@@ -957,7 +957,7 @@ code {
   border: 1px solid var(--brm-screen-2);
   border-radius: 20px;
   background: var(--brm-screen);
-  color: #fff;
+  color: var(--brm-on-screen, #fff);
   font-size: 14px;
   font-weight: 600;
   box-shadow: var(--brm-shadow);
@@ -1000,7 +1000,7 @@ code {
 }
 
 .brm-source.is-project select {
-  border-color: var(--brm-accent);
+  border-color: var(--brm-accent-text, var(--brm-accent));
   color: var(--brm-accent-strong);
 }
 
@@ -1083,23 +1083,33 @@ a.brm-btn {
 
 .brm-welcome-steps li {
   position: relative;
+  display: grid;
+  grid-template-columns: 132px 1fr;
+  gap: 14px;
+  align-items: center;
   margin-bottom: 10px;
-  padding: 10px 12px 10px 44px;
+  padding: 10px 12px 10px 10px;
   border-radius: 10px;
   background: var(--brm-soft);
   counter-increment: step;
 }
 
+.brm-welcome-steps li p {
+  margin: 4px 0 0;
+  color: var(--brm-dim);
+}
+
 .brm-welcome-steps li::before {
   content: counter(step);
   position: absolute;
-  left: 12px;
-  top: 10px;
+  z-index: 2;
+  left: 4px;
+  top: 4px;
   width: 22px;
   height: 22px;
   border-radius: 50%;
   background: var(--brm-accent);
-  color: #fff;
+  color: var(--brm-on-accent, #fff);
   font-size: 12px;
   font-weight: 700;
   line-height: 22px;
@@ -1162,7 +1172,7 @@ a.brm-btn {
 
 .brm-root select:focus {
   outline: none;
-  border-color: var(--brm-accent);
+  border-color: var(--brm-accent-text, var(--brm-accent));
   box-shadow: 0 0 0 3px var(--brm-accent-soft);
 }
 
@@ -1291,7 +1301,7 @@ a.brm-btn {
 }
 
 .brm-send-title input {
-  accent-color: var(--brm-accent);
+  accent-color: var(--brm-accent-text, var(--brm-accent));
 }
 
 .brm-send-quote {
@@ -1337,4 +1347,432 @@ a.brm-btn {
   gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--brm-line);
+}
+
+/* A company's logo instead of the Margin mark (margin.js with brand.json). */
+.brm-logo {
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+/* ---------- Welcome: the pages the team asks to look at ---------- */
+.brm-welcome-focus {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--brm-line);
+  border-left: 4px solid var(--brm-accent);
+  border-radius: 10px;
+}
+
+.brm-welcome-focus ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.brm-welcome-focus li {
+  margin: 2px 0;
+}
+
+.brm-welcome-focus a {
+  color: var(--brm-accent-text, var(--brm-accent));
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+}
+
+/* ---------- Welcome: animated mini-demos (5 s loops, still for reduced motion) ----------
+   The plain styles are the still frame; the animations play the step out. */
+.brm-demo {
+  position: relative;
+  width: 132px;
+  height: 84px;
+  overflow: hidden;
+  border: 1px solid var(--brm-line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.brm-demo i {
+  position: absolute;
+  display: block;
+  font-style: normal;
+}
+
+.brm-demo-site .brm-demo-nav { top: 6px; left: 8px; width: 116px; height: 5px; border-radius: 3px; background: #ece9e1; }
+.brm-demo-site .brm-demo-h { top: 20px; left: 16px; width: 70px; height: 9px; border-radius: 3px; background: #2a2d36; }
+.brm-demo-site .brm-demo-line { top: 36px; left: 16px; width: 96px; height: 4px; border-radius: 2px; background: #d9d5cb; }
+.brm-demo-site .brm-demo-short { top: 44px; width: 64px; }
+
+.brm-demo-cursor {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  width: 11px;
+  height: 15px;
+  fill: var(--brm-fg);
+  stroke: #fff;
+  stroke-width: 1.2;
+  animation: 5s ease-in-out infinite;
+}
+
+.brm-demo-pop {
+  top: 36px;
+  left: 20px;
+  width: 92px;
+  height: 30px;
+  border: 1px solid var(--brm-line);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(14, 16, 22, 0.18);
+  transform-origin: 20% 0;
+  animation: brm-demo-pop 5s ease-out infinite;
+}
+
+.brm-demo-type { top: 7px; left: 7px; width: 56px; height: 4px; border-radius: 2px; background: #8a8f9a; animation: brm-demo-type 5s steps(8) infinite; }
+.brm-demo-send { right: 6px; bottom: 5px; width: 26px; height: 9px; border-radius: 3px; background: var(--brm-accent); animation: brm-demo-press 5s infinite; }
+
+/* 1. Pick element */
+.brm-demo-outline { top: 16px; left: 12px; width: 76px; height: 15px; border: 2px solid var(--brm-accent); border-radius: 3px; background: color-mix(in srgb, var(--brm-accent) 14%, transparent); animation: brm-demo-outline 5s infinite; }
+.brm-demo-pin {
+  top: 9px;
+  left: 84px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--brm-accent);
+  color: var(--brm-on-accent, #fff);
+  font: 700 9px/15px system-ui, sans-serif;
+  text-align: center;
+  animation: brm-demo-pin 5s infinite;
+}
+.brm-demo-pick .brm-demo-cursor { animation-name: brm-cur-pick; }
+
+@keyframes brm-cur-pick {
+  0% { transform: translate(112px, 70px); }
+  20%, 28% { transform: translate(50px, 24px); }
+  24% { transform: translate(50px, 24px) scale(0.85); }
+  52%, 62% { transform: translate(98px, 59px); }
+  57% { transform: translate(98px, 59px) scale(0.85); }
+  85%, 100% { transform: translate(112px, 70px); }
+}
+
+@keyframes brm-demo-outline {
+  0%, 14% { opacity: 0; }
+  18%, 92% { opacity: 1; }
+  96%, 100% { opacity: 0; }
+}
+
+@keyframes brm-demo-pop {
+  0%, 26% { opacity: 0; transform: scale(0.7); }
+  32%, 60% { opacity: 1; transform: scale(1); }
+  66%, 100% { opacity: 0; transform: scale(0.9); }
+}
+
+@keyframes brm-demo-type {
+  0%, 34% { width: 0; }
+  50%, 100% { width: 56px; }
+}
+
+@keyframes brm-demo-press {
+  0%, 55% { filter: none; }
+  57% { filter: brightness(0.75); }
+  60%, 100% { filter: none; }
+}
+
+@keyframes brm-demo-pin {
+  0%, 62% { opacity: 0; transform: scale(0.2); }
+  68% { opacity: 1; transform: scale(1.25); }
+  72%, 92% { opacity: 1; transform: scale(1); }
+  96%, 100% { opacity: 0; }
+}
+
+/* 2. Page comment */
+.brm-demo-bar {
+  left: 30px;
+  bottom: 5px;
+  width: 72px;
+  height: 14px;
+  border-radius: 5px;
+  background: var(--brm-screen);
+}
+.brm-demo-btn { top: 4px; left: 8px; width: 28px; height: 6px; border-radius: 2px; background: var(--brm-prompt); animation: brm-demo-press-btn 5s infinite; }
+.brm-demo-count {
+  top: 2px;
+  right: 5px;
+  min-width: 10px;
+  height: 10px;
+  padding: 0 2px;
+  border-radius: 5px;
+  background: var(--brm-accent);
+  color: var(--brm-on-accent, #fff);
+  font: 700 7px/10px system-ui, sans-serif;
+  text-align: center;
+  animation: brm-demo-count 5s infinite;
+}
+.brm-demo-pop-page { top: 30px; left: 22px; transform-origin: 50% 100%; }
+.brm-demo-page .brm-demo-cursor { animation-name: brm-cur-page; }
+
+@keyframes brm-cur-page {
+  0% { transform: translate(112px, 40px); }
+  18%, 26% { transform: translate(48px, 68px); }
+  22% { transform: translate(48px, 68px) scale(0.85); }
+  52%, 62% { transform: translate(100px, 53px); }
+  57% { transform: translate(100px, 53px) scale(0.85); }
+  85%, 100% { transform: translate(112px, 40px); }
+}
+
+@keyframes brm-demo-press-btn {
+  0%, 20% { filter: none; }
+  22% { filter: brightness(0.7); }
+  25%, 100% { filter: none; }
+}
+
+@keyframes brm-demo-count {
+  0%, 60% { opacity: 0; transform: scale(0.3); }
+  66% { opacity: 1; transform: scale(1.4); }
+  70%, 94% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; }
+}
+
+/* 3. Comments: a reply comes in, it turns review ready, accept */
+.brm-demo-side {
+  top: 0;
+  right: 0;
+  width: 62px;
+  height: 84px;
+  border-left: 1px solid var(--brm-line);
+  background: var(--brm-bg);
+  box-shadow: -3px 0 10px rgba(14, 16, 22, 0.1);
+  animation: brm-demo-side 5s ease-out infinite;
+}
+.brm-demo-msg { top: 18px; left: 6px; width: 44px; height: 10px; border-radius: 4px; background: var(--brm-soft); }
+.brm-demo-reply { top: 32px; left: 12px; width: 44px; background: var(--brm-accent-soft); border-left: 2px solid var(--brm-accent); animation: brm-demo-reply 5s infinite; }
+.brm-demo-status { top: 6px; left: 6px; width: 26px; height: 7px; border-radius: 4px; background: var(--brm-accepted); animation: brm-demo-status 5s infinite; }
+.brm-demo-accept { top: 50px; left: 6px; width: 34px; height: 10px; border-radius: 3px; background: var(--brm-accepted); animation: brm-demo-accept 5s infinite; }
+.brm-demo-comments .brm-demo-cursor { animation-name: brm-cur-comments; }
+
+@keyframes brm-demo-side {
+  0%, 6% { transform: translateX(64px); }
+  16%, 92% { transform: translateX(0); }
+  100% { transform: translateX(64px); }
+}
+
+@keyframes brm-demo-reply {
+  0%, 30% { opacity: 0; transform: translateY(4px); }
+  36%, 100% { opacity: 1; transform: none; }
+}
+
+@keyframes brm-demo-status {
+  0%, 40% { background: var(--brm-open); }
+  44%, 70% { background: var(--brm-review); }
+  73%, 100% { background: var(--brm-accepted); }
+}
+
+@keyframes brm-demo-accept {
+  0%, 42% { opacity: 0; }
+  46%, 70% { opacity: 1; filter: none; }
+  71% { opacity: 1; filter: brightness(0.75); }
+  76%, 100% { opacity: 0; }
+}
+
+@keyframes brm-cur-comments {
+  0%, 46% { transform: translate(40px, 70px); }
+  66%, 72% { transform: translate(90px, 54px); }
+  70% { transform: translate(90px, 54px) scale(0.85); }
+  95%, 100% { transform: translate(40px, 70px); }
+}
+
+/* 4. Overview: a tree of pages with colored dots */
+.brm-demo-map {
+  inset: 8px 10px;
+  border-radius: 6px;
+  background: var(--brm-soft);
+  animation: brm-demo-map 5s infinite;
+}
+.brm-demo-row { left: 6px; right: 6px; height: 11px; border-radius: 3px; background: #fff; }
+.brm-demo-row::before { content: ''; position: absolute; top: 4px; left: 5px; width: 26px; height: 3px; border-radius: 2px; background: #9aa0aa; }
+.brm-demo-row::after { content: ''; position: absolute; top: 2.5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--brm-open); box-shadow: -8px 0 0 var(--brm-review); }
+.brm-demo-row:nth-child(1) { top: 6px; }
+.brm-demo-row:nth-child(2) { top: 21px; left: 16px; }
+.brm-demo-row:nth-child(2)::after { background: var(--brm-accepted); box-shadow: none; }
+.brm-demo-row:nth-child(3) { top: 36px; left: 16px; }
+.brm-demo-row:nth-child(3)::after { background: transparent; border: 1px dashed #b9b4a8; box-shadow: none; width: 4px; height: 4px; }
+.brm-demo-row:nth-child(4) { top: 51px; }
+.brm-demo-row:nth-child(4)::after { background: var(--brm-progress); box-shadow: none; }
+.brm-demo-map .brm-demo-row { animation: brm-demo-row 5s infinite backwards; }
+.brm-demo-map .brm-demo-row:nth-child(2) { animation-delay: 0.25s; }
+.brm-demo-map .brm-demo-row:nth-child(3) { animation-delay: 0.5s; }
+.brm-demo-map .brm-demo-row:nth-child(4) { animation-delay: 0.75s; }
+.brm-demo-map ~ .brm-demo-cursor { animation-name: brm-cur-map; }
+.brm-demo-site:has(~ .brm-demo-map) { opacity: 0.4; }
+
+@keyframes brm-demo-map {
+  0%, 12% { opacity: 0; transform: scale(0.9); }
+  20%, 92% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+
+@keyframes brm-demo-row {
+  0%, 20% { opacity: 0; transform: translateX(-6px); }
+  30%, 92% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+
+@keyframes brm-cur-map {
+  0% { transform: translate(110px, 72px); }
+  14%, 40% { transform: translate(90px, 26px); }
+  60%, 80% { transform: translate(60px, 58px); }
+  100% { transform: translate(110px, 72px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brm-demo,
+  .brm-demo * {
+    animation: none !important;
+  }
+  .brm-demo-cursor {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .brm-welcome-steps li {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Delete: red, with a confirm dialog (Confirm.tsx) ---------- */
+.brm-root {
+  --brm-danger: #c93636;
+  --brm-danger-strong: #a82828;
+  --brm-danger-soft: #fdecec;
+}
+
+.brm-btn.brm-danger {
+  border-color: #efb9b9;
+  color: var(--brm-danger);
+}
+
+.brm-btn.brm-danger:hover:not(:disabled) {
+  border-color: var(--brm-danger);
+  background: var(--brm-danger-soft);
+}
+
+.brm-btn.brm-danger-solid {
+  border-color: var(--brm-danger);
+  background: var(--brm-danger);
+  color: #fff;
+  font-weight: 600;
+}
+
+.brm-btn.brm-danger-solid:hover:not(:disabled) {
+  border-color: var(--brm-danger-strong);
+  background: var(--brm-danger-strong);
+}
+
+.brm-btn.brm-danger-solid:focus-visible {
+  outline: 2px solid var(--brm-danger);
+  outline-offset: 2px;
+}
+
+.brm-confirm {
+  width: min(400px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: var(--brm-bg);
+  color: var(--brm-fg);
+  box-shadow: var(--brm-shadow);
+}
+
+.brm-confirm::backdrop {
+  background: rgba(14, 16, 22, 0.45);
+}
+
+/* Opened at the button that asked: no dark screen, just the box by the comment. */
+.brm-confirm.is-anchored {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(320px, calc(100vw - 16px));
+  animation: brm-confirm-in 0.12s ease-out;
+}
+
+.brm-confirm.is-anchored::backdrop {
+  background: rgba(14, 16, 22, 0.12);
+}
+
+/* Fade only: no scale, so the confirm button is exactly on the Delete button from the start. */
+@keyframes brm-confirm-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.brm-confirm-box {
+  padding: 16px 18px 12px;
+  border-radius: 14px;
+}
+
+.brm-confirm-box.is-danger {
+  border-top: 4px solid var(--brm-danger);
+}
+
+.brm-confirm-hint {
+  margin: 10px 0 0;
+  color: var(--brm-dim);
+  font-size: 12px;
+  text-align: right;
+}
+
+.brm-confirm-hint kbd {
+  padding: 0 4px;
+  border: 1px solid var(--brm-line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--brm-soft);
+  font: 11px ui-monospace, monospace;
+}
+
+.brm-confirm h2 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.brm-confirm-body p {
+  margin: 0 0 8px;
+  color: var(--brm-dim);
+  overflow-wrap: anywhere;
+}
+
+.brm-confirm-body p:first-child {
+  color: var(--brm-fg);
+}
+
+.brm-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.brm-confirm-actions .brm-btn {
+  height: 34px;
+  padding: 0 14px;
+}
+
+/* ---------- Customers: their own feedback first, everyone's on request ---------- */
+.brm-whose {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--brm-line);
+  background: var(--brm-accent-soft);
+  font-weight: 600;
+}
+
+.brm-whose.is-all {
+  background: var(--brm-soft);
 }

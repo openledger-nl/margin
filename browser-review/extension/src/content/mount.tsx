@@ -4,6 +4,7 @@ import css from './styles.css';
 import { App } from './App.tsx';
 import { HOST_TAG } from './targets.ts';
 import { initCapture } from './capture.ts';
+import { brandTokens } from '@brm/shared';
 import { HostContext, type Host } from './host.ts';
 import { Previews } from './previews.ts';
 
@@ -16,6 +17,10 @@ export function mountOverlay(host: Host): { previews: Previews; unmount(): void 
   style.textContent = css;
   const root = document.createElement('div');
   root.className = 'brm-root';
+  // A company's own colors (margin.js with brand.json on the hub); the extension never has one.
+  for (const [role, value] of Object.entries(brandTokens(host.brand ?? { color: null, toolbar: null }))) {
+    root.style.setProperty(`--brm-${role}`, value);
+  }
   shadow.append(style, root);
 
   // Keys typed in our textareas must not trigger the app's own shortcuts.

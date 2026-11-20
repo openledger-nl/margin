@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useHost } from '../host.ts';
-import { Mark } from './Mark.tsx';
+import { BrandMark } from './BrandMark.tsx';
 
 interface Props {
   connected: boolean;
@@ -13,6 +13,8 @@ interface Props {
   onToggleSidebar: () => void;
   onHide: () => void;
   onHelp: () => void;
+  /** Customers: open the overview with the site map. */
+  onOverview?: () => void;
 }
 
 /** Adds "is-bumped" for a moment whenever n goes up. */
@@ -33,7 +35,8 @@ function useBump(n: number): boolean {
 
 export function Toolbar(p: Props) {
   const openBumped = useBump(p.openCount);
-  const review = useHost().mode === 'review';
+  const host = useHost();
+  const review = host.mode === 'review';
   const dotTitle = review
     ? p.connected
       ? 'Connected: your feedback goes straight to the developers'
@@ -42,9 +45,9 @@ export function Toolbar(p: Props) {
       ? 'A coding agent is connected'
       : 'No coding agent is connected. Your comments are saved; your agent sees them when a session with browser-review runs. Click ? for setup.';
   return (
-    <div class="brm-ui brm-toolbar" role="toolbar" aria-label={review ? 'Margin feedback' : 'Margin Browser Review'}>
+    <div class="brm-ui brm-toolbar" role="toolbar" aria-label={review ? `${host.brand?.name ?? 'Margin'} feedback` : 'Margin Browser Review'}>
       <span class="brm-brand" title={dotTitle}>
-        <Mark />
+        <BrandMark />
         <span class={`brm-dot ${p.connected ? 'is-on' : 'is-off'}`} />
       </span>
       <button class={`brm-tool ${p.picking ? 'is-active' : ''}`} onClick={p.onPick} title="Pick an element to comment on, remove or edit (Alt+Shift+P)">
@@ -61,9 +64,25 @@ export function Toolbar(p: Props) {
       </button>
       <button class={`brm-tool ${p.sidebarOpen ? 'is-active' : ''}`} onClick={p.onToggleSidebar} title="Open or close the comments (Alt+C)">
         Comments
-        {p.openCount > 0 && <span class={`brm-count ${openBumped ? 'is-bumped' : ''}`}>{p.openCount}</span>}
-        {p.reviewCount > 0 && <span class="brm-count st-review_ready" title="Review ready">{p.reviewCount}</span>}
+        {p.openCount > 0 && (
+          <span class={`brm-count ${openBumped ? 'is-bumped' : ''}`} title={`${p.openCount} open or in progress, on the whole site`}>
+            {p.openCount}
+          </span>
+        )}
+        {p.reviewCount > 0 && (
+          <span class="brm-count st-review_ready" title={`${p.reviewCount} review ready, on the whole site`}>
+            {p.reviewCount}
+          </span>
+        )}
       </button>
+      {p.onOverview && (
+        <button class="brm-tool" onClick={p.onOverview} title="Overview: every page you looked at and what you said there, on a map of the site. Export PDF.">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M1.5 3.2 5.5 1.8l5 1.6 4-1.4v10.8l-4 1.4-5-1.6-4 1.4zM5.5 3v9.7M10.5 4.6v9.6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+          </svg>
+          Overview
+        </button>
+      )}
       <button class="brm-icon-btn" onClick={p.onHelp} title={review ? 'Help: how to give feedback' : 'Help: setup and how to use'}>
         ?
       </button>

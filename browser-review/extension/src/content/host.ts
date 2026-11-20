@@ -2,7 +2,7 @@
 // HostContext; each entry (content script, side panel) creates its own host.
 import { createContext } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import type { Comment, CreateCommentInput, ProjectSummary, PullSummary, Rect, ScreenshotUpload, SendDecision } from '@brm/shared';
+import type { Brand, Comment, CreateCommentInput, FocusPage, ProjectSummary, PullSummary, Rect, ScreenshotUpload, SendDecision } from '@brm/shared';
 import type { PanelState, PortEvent, SendResult, TabRequest } from '../messages.ts';
 
 /** What the overlay needs from where it runs: the extension, or margin.js on a staging site. */
@@ -33,12 +33,20 @@ export interface Host {
   openHelp(section?: string): void;
   /** The overview page with the site map, for a site or a project. */
   openOverview?(target: { origin?: string; project?: string }): void;
+  /** The page open now changed: right away, for the overview's "Here now" and this session's pages. */
+  markPage?(url: string): void;
   /** A page was opened (load or SPA navigation), for the site map. */
   recordVisit?(url: string, title: string): void;
   /** review: the first visit's welcome text from the hub, or null for the default. */
   readonly welcome?: string | null;
   /** review: the hub's project name, for the welcome. */
   readonly project?: string | null;
+  /** review: the company's look (brand.json on the hub), or null for Margin. The logo URL is absolute. */
+  readonly brand?: Brand | null;
+  /** review: pages the team asks the customer to look at. */
+  readonly focusPages?: FocusPage[];
+  /** review: the customer sees everyone's feedback (true) or only their own. */
+  readonly share?: boolean;
   /** False once the host can't be reached anymore (the extension was reloaded). */
   alive(): boolean;
 }

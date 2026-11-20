@@ -59,7 +59,7 @@ export function useHref(): string {
   useEffect(() => {
     const t = setInterval(() => {
       if (location.href !== href) setHref(location.href);
-    }, 400);
+    }, 250);
     const onPop = () => setHref(location.href);
     addEventListener('popstate', onPop);
     return () => {

@@ -8,6 +8,12 @@ import { SITE_ACCESS, SITE_ACCESS_KEY, SITES_KEY, toSiteAccess, toSites } from '
 
 const $ = (id: string) => document.getElementById(id)!;
 
+// Opened from the toolbar: start at the top, not where it was last time. A #section link still jumps there.
+if (!location.hash) {
+  history.scrollRestoration = 'manual';
+  scrollTo(0, 0);
+}
+
 $('cmd').textContent = MCP_ADD_COMMAND;
 $('cmd-codex').textContent = MCP_ADD_COMMAND_CODEX;
 $('cmd-json').textContent = MCP_JSON_CONFIG;
@@ -202,11 +208,15 @@ async function showProjects(): Promise<void> {
       void storeOp('pull', { id: p.id }).finally(() => void showProjects());
     });
     const remove = document.createElement('button');
-    remove.className = 'link-btn';
+    remove.className = 'link-btn danger';
     remove.textContent = 'Remove';
-    remove.addEventListener('click', () => {
-      if (!confirm(`Remove ${p.name}? Its feedback copies in this browser go too; the hub keeps everything.`)) return;
-      void storeOp('removeProject', { id: p.id }).finally(() => void showProjects());
+    remove.addEventListener('click', async () => {
+      const ok = await confirmDialog(
+        `Remove ${p.name}?`,
+        'Its feedback copies in this browser go too, with any updates you have not sent. The hub keeps everything: add it again to get them back.',
+        'Remove project',
+      );
+      if (ok) void storeOp('removeProject', { id: p.id }).finally(() => void showProjects());
     });
     actions.append(pull, remove);
     const meta = document.createElement('span');
@@ -218,6 +228,17 @@ async function showProjects(): Promise<void> {
     list.append(li);
   }
 }
+/** The page's own confirm dialog, with a red button. Resolves true for the red button. */
+function confirmDialog(title: string, text: string, okLabel: string): Promise<boolean> {
+  const d = $('confirm-dialog') as HTMLDialogElement;
+  $('confirm-title').textContent = title;
+  $('confirm-text').textContent = text;
+  $('confirm-ok').textContent = okLabel;
+  d.returnValue = '';
+  d.showModal();
+  return new Promise((resolve) => d.addEventListener('close', () => resolve(d.returnValue === 'ok'), { once: true }));
+}
+
 void showProjects();
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && PROJECTS_KEY in changes) void showProjects();

@@ -247,6 +247,58 @@
         font-weight: 500;
         text-decoration: underline;
       }
+      .link-btn.danger {
+        color: #c93636;
+      }
+      /* Confirm dialog for removing (instead of the browser's confirm()). */
+      #confirm-dialog {
+        width: min(400px, calc(100vw - 32px));
+        padding: 20px 22px 18px;
+        border: 0;
+        border-top: 4px solid #c93636;
+        border-radius: 14px;
+        background: #fff;
+        color: #0e1016;
+        box-shadow: 0 8px 28px rgba(14, 16, 22, 0.2);
+      }
+      #confirm-dialog::backdrop {
+        background: rgba(14, 16, 22, 0.45);
+      }
+      #confirm-dialog h2 {
+        margin: 0 0 8px;
+        font-size: 17px;
+      }
+      #confirm-dialog p {
+        margin: 0;
+        color: #646a76;
+      }
+      #confirm-dialog .confirm-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      #confirm-dialog button {
+        height: 34px;
+        padding: 0 14px;
+        border: 1px solid #e4e0d6;
+        border-radius: 8px;
+        background: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+      #confirm-dialog button:hover {
+        background: #f4f1ea;
+      }
+      #confirm-dialog #confirm-ok {
+        border-color: #c93636;
+        background: #c93636;
+        color: #fff;
+        font-weight: 600;
+      }
+      #confirm-dialog #confirm-ok:hover {
+        background: #a82828;
+      }
       .status {
         display: flex;
         align-items: center;
@@ -432,7 +484,7 @@
               <li><strong>Remove</strong>: the element disappears right away (preview), your agent removes it in the code.</li>
               <li><strong>Edit</strong>: change its texts or add CSS with a live preview, your agent makes the same change.</li>
             </ul>
-            After sending, the <strong>Comments</strong> count goes up; tick <strong>Show in sidebar</strong> in the box to see the new comment in the sidebar instead (it remembers your choice). Need more room to write? Drag the box's bottom-right corner; it remembers the size. The comments sidebar is the browser's side panel: drag its edge to make it wider. If the <strong>Comments</strong> button can't open it, use the extension icon or <kbd>Alt</kbd>+<kbd>C</kbd>.
+            After sending, the <strong>Comments</strong> count goes up (it counts the whole site, like the sidebar shows it; <strong>This page</strong> narrows the sidebar down); tick <strong>Show in sidebar</strong> in the box to see the new comment in the sidebar instead (it remembers your choice). Need more room to write? Drag the box's bottom-right corner; it remembers the size. The comments sidebar is the browser's side panel: drag its edge to make it wider. If the <strong>Comments</strong> button can't open it, use the extension icon or <kbd>Alt</kbd>+<kbd>C</kbd>.
           </li>
           <li>Or write a <strong>Page comment</strong> about the whole page.</li>
         </ol>
@@ -496,6 +548,12 @@
           comment <strong>Fixed</strong> or <strong>More feedback needed</strong>, in your own words. The customer accepts
           or reopens it on staging. <strong>Overview</strong> in the sidebar shows all feedback on a map of the site, and
           exports a PDF.
+        </p>
+        <p>
+          Each customer sees only their own feedback, unless you change it. In the project's <strong>Overview</strong>,
+          <strong>Review settings</strong> sets the <strong>focus pages</strong> customers are asked to look at (or click
+          ★ on a page in the map) and <strong>who sees what</strong>: everyone's feedback, or only their own, for all
+          customers or per person.
         </p>
         <p>
           To let your agent go to that project's feedback by itself, put this in <code>.margin/project.json</code> in your
@@ -606,5 +664,13 @@
       <footer>Margin Browser Review <span id="version"></span></footer>
     </main>
     <script src="help.js"></script>
-  </body>
+      <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-text"></p>
+      <form method="dialog" class="confirm-actions">
+        <button value="cancel">Cancel</button>
+        <button value="ok" id="confirm-ok" autofocus></button>
+      </form>
+    </dialog>
+</body>
 </html>

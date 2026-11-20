@@ -5,7 +5,8 @@ import { useHost, useSetting } from '../host.ts';
 import { describe } from '../targets.ts';
 import { replyDraft } from '../drafts.ts';
 import { useSendKey } from '../hooks.ts';
-import { Mark } from './Mark.tsx';
+import { BrandMark } from './BrandMark.tsx';
+import { Confirm } from './Confirm.tsx';
 import { isSendKey, sendKeyName } from '../../settings.ts';
 
 export type Filter = 'active' | Status | 'all';
@@ -42,6 +43,10 @@ interface Props {
   onGoTo: (c: Comment) => string | null | Promise<string | null>;
   onOpenPage: (c: Comment) => void;
   onChanged: () => Promise<void>;
+  /** Customers: comments by others they may see but are not shown (0: nothing to switch). */
+  othersCount?: number;
+  showOthers?: boolean;
+  onShowOthers?: (show: boolean) => void;
 }
 
 function time(iso: string): string {
@@ -201,9 +206,10 @@ function useProjects(source: string) {
   return { available: Boolean(api) && projects.length > 0, projects, selected, comments, pull, pulling, pullNote, refresh };
 }
 
-export function Sidebar({ comments, path, origin, connected, focusId, docked, onClose, onHover, onGoTo, onOpenPage, onChanged }: Props) {
+export function Sidebar({ comments, path, origin, connected, focusId, docked, onClose, onHover, onGoTo, onOpenPage, onChanged, othersCount = 0, showOthers = false, onShowOthers }: Props) {
   const host = useHost();
-  const [scope, setScope] = useState<Scope>('page');
+  // The whole site by default: everything you said, wherever; This page narrows it down.
+  const [scope, setScope] = useState<Scope>('site');
   const [filter, setFilter] = useState<Filter>('active');
   const [source, setSource] = useSetting(SOURCE_KEY, (v) => (typeof v === 'string' ? v : ''));
   const projects = useProjects(source);
@@ -254,7 +260,7 @@ export function Sidebar({ comments, path, origin, connected, focusId, docked, on
         />
       )}
       <header class="brm-side-head">
-        <Mark />
+        <BrandMark />
         <strong>Comments</strong>
         {!project && (
           <div class="brm-seg">
@@ -267,7 +273,7 @@ export function Sidebar({ comments, path, origin, connected, focusId, docked, on
           </div>
         )}
         {project && <span class="brm-spacer" />}
-        {host.openOverview && (
+        {host.openOverview && host.mode !== 'review' && (
           <button
             class="brm-btn brm-overview-btn"
             title="All feedback on a map of the site: which pages were looked at, and what was said where. Export as PDF."
@@ -323,6 +329,14 @@ export function Sidebar({ comments, path, origin, connected, focusId, docked, on
           </span>
           <button class="brm-btn brm-primary" onClick={() => setSending(pending)}>
             Send to customer…
+          </button>
+        </div>
+      )}
+      {onShowOthers && othersCount > 0 && (
+        <div class={`brm-whose ${showOthers ? 'is-all' : ''}`}>
+          <span>{showOthers ? 'Everyone\u2019s feedback' : 'Your feedback'}</span>
+          <button class="brm-btn" onClick={() => onShowOthers(!showOthers)}>
+            {showOthers ? 'Only mine' : `Show all other feedback (${othersCount})`}
           </button>
         </div>
       )}
@@ -461,6 +475,18 @@ function Card({ comment: c, showPath, onThisPage, projectName, onSend, open, foc
   }
 
   const canUndo = c.kind !== 'comment' && canDelete(c) && mine && !customer;
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const deleteButton = useRef<HTMLButtonElement>(null);
+  const deleting = useRef(false);
+  /** Once, however it was confirmed (the dialog's button, Enter, or a double-click on Delete). */
+  const doDelete = () => {
+    setConfirmDelete(false);
+    if (deleting.current) return;
+    deleting.current = true;
+    void run(() => api.remove(c.id)).finally(() => {
+      deleting.current = false;
+    });
+  };
 
   return (
     <article
@@ -600,14 +626,28 @@ function Card({ comment: c, showPath, onThisPage, projectName, onSend, open, foc
             )}
             {c.kind === 'comment' && canDelete(c) && mine && !customer && (
               <button
-                class="brm-btn"
+                ref={deleteButton}
+                class="brm-btn brm-danger"
                 disabled={busy}
-                onClick={() => {
-                  if (confirm(`Delete comment #${c.id}?`)) void run(() => api.remove(c.id));
-                }}
+                onClick={() => setConfirmDelete(true)}
+                onDblClick={doDelete}
+                title="Delete this comment (click twice, or Delete then Enter)"
               >
                 Delete
               </button>
+            )}
+            {confirmDelete && (
+              <Confirm
+                title={`Delete comment #${c.id}?`}
+                confirmLabel="Delete comment"
+                danger
+                anchor={deleteButton.current}
+                onCancel={() => setConfirmDelete(false)}
+                onConfirm={doDelete}
+              >
+                <p>"{(c.messages.find((m) => m.author === 'user')?.body ?? '').slice(0, 140)}"</p>
+                <p>The comment, its replies and screenshots are gone for good. This can't be undone.</p>
+              </Confirm>
             )}
             <span class="brm-spacer" />
             {customer && c.outbox?.length ? (

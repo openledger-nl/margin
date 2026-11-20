@@ -18,6 +18,9 @@ export interface Project extends ProjectSummary {
 
 export const DEV_TOKEN_SHAPE = /^mdev_[A-Za-z0-9_-]{20,100}$/;
 
+/** chrome.storage.session key of an origin's browse session. */
+export const sessionKey = (origin: string): string => `browse-session:${origin}`;
+
 export function toProjects(value: unknown): Project[] {
   if (!Array.isArray(value)) return [];
   return value.filter(

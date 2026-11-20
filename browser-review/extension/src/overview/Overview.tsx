@@ -1,8 +1,9 @@
 // The feedback overview: the site as a map of pages, who looked at what, and the
 // feedback per page. One component, two pages: the extension's overview.html
 // (developers) and the hub's /overview (customers). Export PDF prints it.
-import { useEffect, useMemo, useState } from 'preact/hooks';
-import { buildSiteMap, KIND_LABELS, STATUSES, STATUS_LABELS, type Comment, type PageVisit, type SiteNode, type Status } from '@brm/shared';
+import type { ComponentChildren } from 'preact';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { buildSiteMap, KIND_LABELS, STATUSES, STATUS_LABELS, type Brand, type Comment, type FocusPage, type PageVisit, type SiteNode, type Status } from '@brm/shared';
 import { Mark } from '../content/ui/Mark.tsx';
 
 export interface OverviewData {
@@ -14,7 +15,21 @@ export interface OverviewData {
   visits: PageVisit[];
   /** Whose comments are "You": the token name, or null when messages without a name are yours (the extension). */
   me: string | null;
+  /** Pages the team asked reviewers to look at. */
+  focusPages?: FocusPage[];
+  /** Customers: false when they only see their own feedback. */
+  share?: boolean;
+  /** Customers: the company's look (brand.json). */
+  brand?: Brand | null;
+  /** The site, for links to its pages: "https://staging.acme.com". */
+  origin: string;
+  /** Paths the reader opened in this session (kept in their browser). */
+  session?: string[];
 }
+
+export const MARGIN_REPO = 'https://github.com/openledger-nl/margin';
+/** A visit this recent is where someone is now. */
+const HERE_MS = 15 * 60_000;
 
 export interface Source {
   key: string;
@@ -28,7 +43,28 @@ interface Props {
   sources?: Source[];
   source?: string;
   onSource?: (key: string) => void;
+  /** Reload every this many ms while the page is visible (a second screen follows along). */
+  live?: number;
+  /** "Powered by Margin" in the footer (the customer side). */
+  credit?: boolean;
+  /** Shown under the header: the developer's review settings for a project. */
+  panel?: ComponentChildren;
+  /** The developer marks or unmarks a focus page from the map. */
+  onToggleFocus?: (path: string) => void;
+  /** Focus pages from the page itself (the developer edits them), instead of from load(). */
+  focusPages?: FocusPage[];
+  /** Calls back when the data changed elsewhere (another tab), for an update right away. */
+  subscribe?: (changed: () => void) => () => void;
+  /** Opens a page of the site; without it, links open in one "site" tab. */
+  openPage?: (url: string) => boolean;
+  /** Customers: start with their own feedback, with a button for everyone else's. */
+  mineFirst?: boolean;
+  /** This browser's session (pages opened, the one open now): read right away on every change. */
+  loadSession?: () => Promise<{ paths: string[]; current: string | null }>;
 }
+
+/** All page links open in this one tab, so a second screen does not pile up tabs. */
+const SITE_TAB = 'margin-site';
 
 type StatusFilter = 'active' | Status | 'all';
 const ACTIVE: Status[] = ['open', 'in_progress', 'review_ready'];
@@ -54,25 +90,63 @@ export function commentLink(c: Comment): string {
   return u.href;
 }
 
-export function Overview({ load, screenshot, sources, source, onSource }: Props) {
+export function Overview({ load, screenshot, sources, source, onSource, live = 0, credit = false, panel, onToggleFocus, focusPages, subscribe, openPage, loadSession, mineFirst = false }: Props) {
   const [data, setData] = useState<OverviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [person, setPerson] = useState('');
+  const [person, setPerson] = useState(mineFirst ? 'You' : '');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [printing, setPrinting] = useState(false);
+  const [onlyFocus, setOnlyFocus] = useState(false);
+  const [updated, setUpdated] = useState<Date | null>(null);
 
   const refresh = () =>
     load()
       .then((d) => {
         setData(d);
         setError(null);
+        setUpdated(new Date());
       })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
 
+  // Live: keep following while it is on screen (also on a second screen), not while printing.
+  const printingRef = useRef(false);
+  printingRef.current = printing;
+  useEffect(() => {
+    if (!live) return;
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible' && !printingRef.current) void refresh();
+    }, live);
+    const onVisible = () => document.visibilityState === 'visible' && void refresh();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [load, live]);
+
+  // The session is local: "Here now" moves as soon as the site tab changes page, without waiting for the hub.
+  const [sess, setSess] = useState<{ paths: string[]; current: string | null } | null>(null);
+  const readSession = () => void loadSession?.().then(setSess, () => {});
+  useEffect(readSession, [loadSession]);
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const off = subscribe?.(() => {
+      readSession();
+      // The rest (visits, comments) a moment later, once for a burst of changes.
+      clearTimeout(t);
+      t = setTimeout(() => void refresh(), 600);
+    });
+    return () => {
+      clearTimeout(t);
+      off?.();
+    };
+  }, [load, subscribe, loadSession]);
+  const sessionPaths = sess?.paths ?? data?.session ?? [];
+
   useEffect(() => {
     setData(null);
-    setPerson('');
+    setPerson(mineFirst ? 'You' : '');
     setOpen(new Set());
     void refresh();
   }, [load]);
@@ -90,8 +164,21 @@ export function Overview({ load, screenshot, sources, source, onSource }: Props)
     const statuses = status === 'active' ? ACTIVE : status === 'all' ? [...STATUSES] : [status];
     const comments = data.comments.filter((c) => statuses.includes(c.status) && (!person || author(c, data.me) === person));
     const visits = data.visits.filter((v) => !person || (v.by === data.me ? 'You' : v.by) === person);
-    return buildSiteMap(comments, visits);
-  }, [data, person, status]);
+    return buildSiteMap(comments, visits, focusPages ?? data.focusPages ?? [], person && person !== 'You' ? [] : sessionPaths);
+  }, [data, person, status, focusPages, sessionPaths.join('\n')]);
+
+  /** The page the reader (or, in the extension, the developer) opened last, if just now. */
+  const here = useMemo(() => {
+    if (!data) return null;
+    if (sess) return sess.current;
+    const mine = data.visits.filter((v) => v.by === (data.me ?? 'You')).sort((a, b) => b.lastAt.localeCompare(a.lastAt))[0];
+    return mine && Date.now() - Date.parse(mine.lastAt) < HERE_MS ? mine.path : null;
+  }, [data, sess]);
+
+  // Follow along: bring the page you just opened into view.
+  useEffect(() => {
+    if (live && here) document.querySelector(`[data-path="${CSS.escape(here)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [here, live]);
 
   const exportPdf = () => {
     setPrinting(true);
@@ -117,10 +204,17 @@ export function Overview({ load, screenshot, sources, source, onSource }: Props)
     );
   }
 
-  const nodes = flatten(tree);
-  const visited = nodes.filter((n) => n.visited).length;
+  const othersCount = data.comments.filter((c) => author(c, data.me) !== 'You').length;
+  const all = flatten(tree);
+  const focusNodes = all.filter((n) => n.focus !== null);
+  const nodes = onlyFocus ? focusNodes : all;
+  const session = new Set(sessionPaths);
+  const seen = (n: SiteNode) => n.visited || session.has(n.path);
+  const visited = nodes.filter(seen).length;
   const withFeedback = nodes.filter((n) => n.comments.length > 0).length;
+  const seenNow = nodes.filter((n) => session.has(n.path)).length;
   const counts = STATUSES.map((s) => [s, nodes.reduce((sum, n) => sum + n.counts[s], 0)] as const);
+  const logo = data.brand?.logo;
   const toggle = (path: string) =>
     setOpen((o) => {
       const next = new Set(o);
@@ -131,7 +225,7 @@ export function Overview({ load, screenshot, sources, source, onSource }: Props)
   return (
     <main class={`ov ${printing ? 'is-printing' : ''}`}>
       <header class="ov-head">
-        <Mark />
+        {logo ? <img class="brm-mark ov-logo" src={logo} alt="" /> : <Mark />}
         <div class="ov-title">
           <h1>Feedback overview: {data.title}</h1>
           <p class="ov-dim">{data.subtitle}</p>
@@ -146,19 +240,42 @@ export function Overview({ load, screenshot, sources, source, onSource }: Props)
               ))}
             </select>
           )}
-          <button class="ov-btn" onClick={() => void refresh()}>
-            Refresh
-          </button>
+          {live ? (
+            <span class="ov-live" title="This page updates by itself: keep it open on a second screen while you browse.">
+              <i /> Live{updated ? ` · ${updated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : ''}
+            </span>
+          ) : (
+            <button class="ov-btn" onClick={() => void refresh()}>
+              Refresh
+            </button>
+          )}
           <button class="ov-btn ov-primary" onClick={exportPdf} title="Opens the print dialog: choose Save as PDF">
             Export PDF
           </button>
         </div>
       </header>
 
+      {panel}
+
       <section class="ov-stats" aria-label="Summary">
+        {focusNodes.length > 0 && (
+          <button
+            class={`ov-stat ov-focus-stat ${onlyFocus ? 'is-active' : ''}`}
+            onClick={() => setOnlyFocus((v) => !v)}
+            aria-pressed={onlyFocus}
+            title={onlyFocus ? 'Show every page' : 'Show only the focus pages'}
+          >
+            ★ <strong>{focusNodes.filter(seen).length}</strong> of {focusNodes.length} focus pages visited
+          </button>
+        )}
         <span class="ov-stat">
           <strong>{visited}</strong> pages visited
         </span>
+        {seenNow > 0 && (
+          <span class="ov-stat ov-session-stat" title="Pages you opened since you started browsing (until a break of 30 minutes)">
+            ✓ <strong>{seenNow}</strong> this session
+          </span>
+        )}
         <span class="ov-stat">
           <strong>{withFeedback}</strong> with feedback
         </span>
@@ -194,21 +311,33 @@ export function Overview({ load, screenshot, sources, source, onSource }: Props)
             ))}
           </select>
         </label>
+        {mineFirst && othersCount > 0 && (
+          <button class="ov-btn ov-whose" onClick={() => setPerson(person === 'You' ? '' : 'You')}>
+            {person === 'You' ? `Show all other feedback (${othersCount})` : 'Only mine'}
+          </button>
+        )}
         <span class="ov-legend ov-dim">
           <span class="ov-tag">no feedback</span> visited, nothing said yet
         </span>
       </nav>
+
+      {data.share === false && <p class="ov-dim ov-private">Only your own feedback and visits are shown here.</p>}
 
       <section class="ov-map" aria-label="Site map">
         {nodes.map((n) => (
           <PageRow
             key={n.path}
             node={n}
-            depth={depth(n.path)}
+            here={n.path === here}
+            seen={session.has(n.path)}
+            href={new URL(n.path, data.origin).href}
+            openPage={openPage}
+            depth={onlyFocus ? 0 : depth(n.path)}
             open={printing || open.has(n.path)}
             printing={printing}
             me={data.me}
             onToggle={() => toggle(n.path)}
+            onToggleFocus={onToggleFocus}
             screenshot={screenshot}
           />
         ))}
@@ -216,7 +345,19 @@ export function Overview({ load, screenshot, sources, source, onSource }: Props)
           <p class="ov-dim ov-empty">Nothing yet. Pages show here as soon as someone opens them with the toolbar on.</p>
         )}
       </section>
-      <footer class="ov-foot ov-dim">Margin · {new Date().toLocaleString()}</footer>
+      <footer class="ov-foot ov-dim">
+        {credit ? (
+          <>
+            Powered by{' '}
+            <a href={MARGIN_REPO} target="_blank" rel="noopener">
+              Margin
+            </a>
+          </>
+        ) : (
+          'Margin'
+        )}{' '}
+        · {(updated ?? new Date()).toLocaleString()}
+      </footer>
     </main>
   );
 }
@@ -231,35 +372,83 @@ function depth(path: string): number {
 
 function PageRow(p: {
   node: SiteNode;
+  here: boolean;
+  /** Opened in this session. */
+  seen: boolean;
+  href: string;
+  openPage?: Props['openPage'];
   depth: number;
   open: boolean;
   printing: boolean;
   me: string | null;
   onToggle: () => void;
+  onToggleFocus?: (path: string) => void;
   screenshot: Props['screenshot'];
 }) {
   const n = p.node;
   const people = [...new Set(n.visitors.map((v) => v.by))];
   const has = n.comments.length > 0;
+  const visited = n.visited || p.seen;
+  const star = p.onToggleFocus && (
+    <button
+      class={`ov-star ${n.focus !== null ? 'is-on' : ''}`}
+      onClick={() => p.onToggleFocus?.(n.path)}
+      title={n.focus !== null ? 'No longer a focus page' : 'Make this a focus page: customers are asked to look at it'}
+      aria-pressed={n.focus !== null}
+    >
+      ★
+    </button>
+  );
   return (
-    <div class={`ov-page ${n.visited ? '' : 'is-unvisited'} ${p.open && has ? 'is-open' : ''}`} style={{ '--ov-depth': p.depth }}>
-      <button class="ov-row" onClick={p.onToggle} disabled={!has} aria-expanded={has ? p.open : undefined}>
-        <span class="ov-caret">{has ? (p.open ? '▾' : '▸') : ''}</span>
-        <code class="ov-path">{n.path === '/' ? '/' : `/${n.segment}`}</code>
-        <span class="ov-page-title">{n.title ?? ''}</span>
+    <div
+      class={`ov-page ${visited ? '' : 'is-unvisited'} ${p.open && has ? 'is-open' : ''} ${n.focus !== null ? 'is-focus' : ''} ${p.here ? 'is-here' : ''}`}
+      style={{ '--ov-depth': p.depth }}
+      data-path={n.path}
+    >
+      {star}
+      {/* The row folds the comments; the path is a link to the page. */}
+      <div class="ov-row" onClick={(e) => has && !(e.target as Element).closest('a, button') && p.onToggle()}>
+        <button class="ov-caret" onClick={p.onToggle} disabled={!has} aria-expanded={has ? p.open : undefined} aria-label={`${p.open ? 'Hide' : 'Show'} the comments on ${n.path}`}>
+          {has ? (p.open ? '▾' : '▸') : ''}
+        </button>
+        <a
+          class="ov-path"
+          href={p.href}
+          target={SITE_TAB}
+          title={`Open ${n.path}`}
+          onClick={(e) => {
+            if (p.openPage?.(p.href)) e.preventDefault();
+          }}
+        >
+          {n.path === '/' || p.depth === 0 ? n.path : `/${n.segment}`}
+        </a>
+        <span class="ov-page-title">
+          {n.title ?? ''}
+          {n.focus !== null && (
+            <span class="ov-focus" title="The team asked you to look at this page">
+              ★ Focus{n.focus ? `: ${n.focus}` : ''}
+            </span>
+          )}
+          {p.here && <span class="ov-here">Here now</span>}
+          {p.seen && !p.here && (
+            <span class="ov-seen" title="You opened this page in this session">
+              ✓ Visited this session
+            </span>
+          )}
+        </span>
         <span class="ov-counts">
           {STATUSES.filter((s) => n.counts[s]).map((s) => (
             <span key={s} class={`ov-count st-${s}`} title={STATUS_LABELS[s]}>
               {n.counts[s]}
             </span>
           ))}
-          {n.visited && !has && <span class="ov-tag">no feedback</span>}
-          {!n.visited && !has && <span class="ov-dim">not visited</span>}
+          {visited && !has && <span class="ov-tag">no feedback</span>}
+          {!visited && !has && <span class={n.focus !== null ? 'ov-tag ov-todo' : 'ov-dim'}>not visited</span>}
         </span>
         <span class="ov-visitors ov-dim">
           {people.length > 0 && `${people.join(', ')} · ${when(n.visitors[0]!.lastAt)}`}
         </span>
-      </button>
+      </div>
       {has && (
         <div class={`ov-comments ${p.open ? '' : 'is-folded'}`}>
           {n.comments.map((c) => (
