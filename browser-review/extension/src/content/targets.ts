@@ -161,12 +161,30 @@ export function findTarget(target: TargetInfo): Element | null {
       // cssPath ends in a bare tag step, unlike an id or attribute selector.
       const positional = i === target.selectors.length - 1
         && /(?:^| > )[a-z][a-z0-9-]*(?::nth-of-type\(\d+\))?$/.test(sel);
-      if (positional && textOf(match) !== target.text) return findByText(target) ?? match;
+      if (positional && textOf(match) !== target.text) return findByTextCached(target) ?? match;
       return match;
     }
     if (matches.length > 1) return matches.find((m) => textOf(m) === target.text) ?? matches[0] ?? null;
   }
-  return findByText(target);
+  return findByTextCached(target);
+}
+
+/**
+ * Pins and outlines look their element up on every animation frame. The text scan
+ * reads the text of every element with the tag, which is too slow for that when
+ * it keeps missing (an edit preview changed the text, or the element is gone).
+ * So each target scans at most once per TEXT_SCAN_MS and reuses the result.
+ */
+const TEXT_SCAN_MS = 500;
+const textScans = new WeakMap<TargetInfo, { doc: Document; at: number; el: Element | null }>();
+
+function findByTextCached(target: TargetInfo): Element | null {
+  const now = Date.now();
+  const last = textScans.get(target);
+  if (last && last.doc === document && now - last.at < TEXT_SCAN_MS && (!last.el || last.el.isConnected)) return last.el;
+  const el = findByText(target);
+  textScans.set(target, { doc: document, at: now, el });
+  return el;
 }
 
 function findByText(target: TargetInfo): Element | null {

@@ -149,4 +149,22 @@ describe('findTarget', () => {
     const pinned = element('pinned');
     assert.equal(findTarget({ ...target, text: textOf(pinned) }), pinned);
   });
+
+  it('scans the page by text at most once in a short time per target', () => {
+    page('<main><p>Something else</p></main>');
+    let scans = 0;
+    const byTag = document.getElementsByTagName.bind(document);
+    document.getElementsByTagName = ((tag: string) => (scans++, byTag(tag))) as typeof document.getElementsByTagName;
+    const stored = { ...target, selectors: ['#gone'] };
+    for (let i = 0; i < 5; i++) assert.equal(findTarget(stored), null);
+    assert.equal(scans, 1);
+  });
+
+  it('scans again when the element it found was removed', () => {
+    page('<p id="pinned">Pinned text</p><p id="other">Pinned text</p>');
+    const stored = { ...target, selectors: ['#gone'] };
+    assert.equal(findTarget(stored), element('pinned'));
+    element('pinned').remove();
+    assert.equal(findTarget(stored), element('other'));
+  });
 });
