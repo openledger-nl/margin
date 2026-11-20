@@ -1,0 +1,13 @@
+{
+  "name": "@brm/shared",
+  "version": "1.1.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p ."
+  }
+}

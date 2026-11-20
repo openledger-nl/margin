@@ -1,4 +1,4 @@
-// A minimal zip writer (deflate, no dependencies) for packaging dist/. Same as browser/extension/zip.ts.
+// A minimal zip writer (deflate, no dependencies) for packaging dist/. Same as browser-review/extension/zip.ts.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
