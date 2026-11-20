@@ -15,9 +15,13 @@ hub/         margin review hub, a Docker image: customers comment on a staging s
              with a review token, developers pull with a developer token. The shared
              Store over files (fs-db.ts), comments also written as Markdown. hub/README.md
 extension/   MV3 extension: background worker owns the data (shared Store over IndexedDB, idb.ts),
-             overlay (Preact in a Shadow DOM), threads side panel (panel.tsx;
+             overlay (Preact in a Shadow DOM), comments side panel (panel.tsx;
              Firefox: sidebar_action), help page, notice popup.
-             build.ts makes dist/ (Chromium) and, with --firefox, dist-firefox/
+             Review-hub projects: sync.ts (pull; status changes go to the hub first), hub-client.ts.
+             embed/: margin.js, the same overlay for customers on staging (web-host.ts, capture.ts).
+             overview/: the feedback overview with a site map, an extension page and the hub's /overview.
+             build.ts makes dist/ (Chromium) and, with --firefox, dist-firefox/;
+             build-embed.ts makes dist-embed/margin.js
 demo/        Vite + React demo app with flaws on purpose (`pnpm demo`); not released
 scripts/     version.ts: Conventional Commit checks and version bumps
 .githooks/   commit-msg hook: checks the Conventional Commit message
@@ -32,11 +36,12 @@ the first holds the port (hub), the rest connect to it (/peer).
 pnpm build           # extension/dist, extension/dist-firefox, server/dist/cli.js
 pnpm dev             # watch + hot reload of extension/dist (dev:firefox: dist-firefox)
 pnpm demo            # demo app on http://localhost:5173 to try it on
+pnpm demo:hub        # the demo as a staging site with the hub (see README, Development)
 pnpm test            # all tests
 pnpm typecheck       # all packages
 pnpm package         # release/browser-review-<version>-chrome.zip and -firefox.zip
 pnpm publish:mcp     # publish browser-review-mcp to npm (only when the user asks)
-pnpm build:hub       # hub/dist/hub.js; image: docker build -f hub/Dockerfile -t margin-hub .
+pnpm build:hub       # margin.js + hub/dist/hub.js; image: docker build -f hub/Dockerfile -t margin-hub .
 ```
 
 After a change: run `pnpm typecheck`, `pnpm test` and `pnpm build`.
@@ -46,6 +51,7 @@ on main versions and releases every Margin extension together (`scripts/release.
 repo root): one GitHub release `Margin x.y.z` with the installers for both extensions. The
 release notes list the `feat` and `fix` commit summaries, so those are what users read:
 write them for users. The MCP server is published to npm by hand, not by CI.
+The UI uses the Margin colors (brand/README.md) via the --brm-* tokens in styles.css.
 When a change is visible to the user (a button, shortcut, behaviour, setup), update
 the README, and the help page (`extension/static/help.html`) when it affects how to
 set up or use it. The help page is what users read first.

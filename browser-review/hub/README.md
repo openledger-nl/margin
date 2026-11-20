@@ -4,10 +4,8 @@ A small server that runs next to your **staging site** in Docker. Customers leav
 feedback through a personal link; developers pull it with a developer token.
 Each comment is stored as Markdown with its screenshots, on a volume you own.
 
-> **Status:** the hub works on its own (API, tokens, storage, Docker image). Two
-> pieces that use it are still being built: the overlay that customers see on
-> the staging site (`margin.js`), and the projects in the Margin extension that
-> pull from the hub. See [docs/hub-plan.md](../docs/hub-plan.md).
+> margin.js (the customer toolbar) and the projects in the Margin extension are
+> part of this; see the main [README](../README.md#feedback-from-customers-on-staging).
 
 ```mermaid
 flowchart LR
@@ -54,6 +52,15 @@ flowchart LR
 
    Caddy: `handle_path /__margin/* { reverse_proxy margin:4780 }`
 
+4. **Load the toolbar on staging** (never in the production build). It does
+   nothing without a review link:
+
+   ```html
+   <script src="/__margin/margin.js" defer></script>
+   ```
+
+   To pin a version with an integrity hash, use what `margin sri` prints.
+
 ## Tokens
 
 Tokens are managed only from inside the container: there is no admin API on
@@ -84,6 +91,8 @@ docker compose exec margin margin token revoke "Anna (client)"
   feedback/0012.md       the same comment as Markdown, rewritten on every change
   feedback/0012-7.png    its screenshots
   tokens.json            token names and hashes (written by the CLI only)
+  site-map.md            every page reviewers opened, who looked, and its comments
+  visits.json            the page visits behind it
   token-usage.json, counters.json, deletions.json
 ```
 
@@ -101,11 +110,15 @@ to valid tokens.
 | `MARGIN_DATA` | `/data/.margin` | Data folder, a volume outside the webroot |
 | `PORT` | `4780` | |
 | `MARGIN_COMMENTS_PER_HOUR` | `60` | New comments per review token per hour |
+| `MARGIN_WELCOME` | – | Welcome text customers see once, `{name}` for theirs; without it a default welcome |
 
 ## API
 
 | | Token | |
 |---|---|---|
+| `GET /api/review/me` | review | `{ name, project, welcome }`: whose link this is |
+| `POST /api/review/visits` `{ url, title }` | review | A page the customer opened (path and title only) |
+| `GET /api/review/visits`, `GET /api/dev/visits` | review, developer | `{ visits }`: who looked at which page |
 | `GET /api/review/comments` | review | All comments of the project |
 | `POST /api/review/comments` | review | New comment (`CreateCommentInput`, up to 15 MB with screenshots) |
 | `GET /api/review/comments/:id` | review | One comment |
@@ -121,7 +134,8 @@ to valid tokens.
 | `POST /api/dev/comments/:id/reply` `{ message }` | developer | |
 | `POST /api/dev/comments/:id/submit_solution` `{ note, files? }` | developer | |
 | `GET /api/dev/screenshots/:id` | developer | `{ dataUrl }` |
-| `GET /margin.js`, `/margin-<version>.js` | – | The staging overlay (once built); `margin sri` prints the tags |
+| `GET /margin.js`, `/margin-<version>.js` | – | The customer toolbar; `margin sri` prints a pinned tag with integrity |
+| `GET /overview` | – | The customer's feedback overview with a site map and PDF export (its script reads the token from the staging site) |
 | `GET /help`, `/healthz` | – | |
 
 Errors are JSON `{ error }` with 400, 401, 403, 404, 409 (not allowed in this

@@ -46,7 +46,7 @@ localhost only. Everything stays on your machine. See
 ## See it
 
 The toolbar sits at the bottom of your app: pick an element, comment on the
-whole page, or open the threads.
+whole page, or open the comments.
 
 **Tip:** hold down **Left Alt** and the element picker starts right away. Click
 an element while you hold it, or let go of Alt to stop. (Change the key or turn
@@ -209,18 +209,19 @@ of flaws is in [demo/README.md](demo/README.md); `git checkout demo/` resets it.
 
 | Action | How |
 |---|---|
-| Show the overlay with the Threads sidebar open (click again to hide) | the extension icon, or Alt+Shift+R. The sidebar is the browser's side panel (Firefox: its sidebar), so the page gets narrower instead of being covered |
+| Show the overlay with the comments sidebar open (click again to hide) | the extension icon, or Alt+Shift+R. The sidebar is the browser's side panel (Firefox: its sidebar), so the page gets narrower instead of being covered |
 | Comment on an element | **Pick element** (Alt+Shift+P), click the element, write, **Add comment** |
 | Pick while holding a key | hold **Left Alt**, click the element; release Alt to stop. Change the key (or turn it off) on the help page. **Pick element** and its shortcut keep the picker on until you pick or press Esc |
 | Pick the parent element | mouse wheel up or arrow up while picking (down goes back) |
 | Remove an element | pick it, **Remove** tab, **Remove element**. It disappears |
 | Edit text and CSS | pick it, **Edit** tab, change the texts, add CSS, **Save edit** |
-| See the new thread right after sending | tick **Open thread** in the comment box (remembered). Off: only the Threads count goes up |
+| See the new comment right after sending | tick **Show in sidebar** in the comment box (remembered). Off: only the Comments count goes up |
 | Make the comment box taller | drag its bottom-right corner; the size is remembered |
-| Make the Threads sidebar wider or narrower | drag its edge; the browser remembers the width |
+| Make the comments sidebar wider or narrower | drag its edge; the browser remembers the width |
 | Comment on the page | **Page comment** (Alt+Shift+C) |
-| See all threads | **Threads** (Alt+Shift+T): this page or the whole site. **Show** picks the status: not accepted yet (open, in progress and review ready together), one status, or all. Threads start expanded; **Collapse all** gives an overview (remembered), **Expand all** opens them again. The browser may refuse to open its side panel from the **Threads** button or a pin (it only allows that from its own controls); the toolbar then says to use the extension icon or Alt+Shift+T. Once open, pins and **Open thread** show their thread in it |
-| Jump to a thread's element | **Go to** in the thread. On another page it opens that page first. If the element is gone, you land on the page. **Open page** always opens the page itself. |
+| See all feedback on a map of the site | **Overview** in the sidebar: every page you opened, with its comments by status. **Export PDF** saves it |
+| See all comments | **Comments** (Alt+C, opens and closes them): this page or the whole site. **Show** picks the status: not accepted yet (open, in progress and review ready together), one status, or all. Each comment has a colored stripe for its status: blue open, amber in progress, purple review ready, green accepted. Comments start collapsed, as an overview: click one to open it. **Expand all** opens them all (remembered), **Collapse all** goes back. The browser may refuse to open its side panel from the **Comments** button or a pin (it only allows that from its own controls); the toolbar then says to use the extension icon or Alt+C. Once open, pins and **Show in sidebar** show their comment in it |
+| Jump to a comment's element | **Go to** in the comment. On another page it opens that page first. If the element is gone, you land on the page. **Open page** always opens the page itself. |
 | Help | **?** in the toolbar or the sidebar |
 | Change the shortcuts | they are browser shortcuts: help page, **Change shortcuts** (`brave://extensions/shortcuts`; Firefox: about:addons, gear, Manage Extension Shortcuts) |
 | Send a comment or reply | Enter (Shift+Enter for a new line). Prefer Enter for new lines? On the help page, set **Send** to Ctrl+Enter |
@@ -279,15 +280,20 @@ Review ready the preview turns off, so you see what the code really does now.
 
 | Tool | What it does |
 |---|---|
-| `list_comments` | List comments. Default: open and in progress. Filter by status or site. |
+| `list_comments` | List comments. Default: open and in progress. Filter by status, site or review-hub project (pulls it first). |
 | `get_comment` | Everything about one comment: page, selectors, HTML, React components, source file, requested change, thread, solution, plus the screenshot. |
 | `get_screenshot` | The stored page or element screenshot. |
 | `capture_screenshot` | A fresh screenshot from the open tab, with previews switched off, to check a fix. |
 | `start_work` | Set to In progress. |
 | `reply` | Write in the thread, for example to ask a question. |
 | `submit_solution` | Set to Review ready with a note and the changed files. |
+| `list_projects` | The review-hub projects added in the extension (customer feedback on staging), with their last pull. |
+| `pull_feedback` | Get new customer feedback from the hubs now. |
 
-## Feedback from customers on staging (in progress)
+On customer feedback the same tools work; `start_work`, `reply` and
+`submit_solution` go to the hub first, so the customer sees them on staging.
+
+## Feedback from customers on staging
 
 Customers, designers or a PM leave feedback on your **staging site** through a
 personal link, without installing anything. The **margin review hub** stores it
@@ -360,10 +366,6 @@ sequenceDiagram
   Site->>Hub: POST /api/review/comments/12/accept
 ```
 
-**Status:** the hub works (API, tokens, storage, Docker image). The toolbar
-customers see on staging (`margin.js`) and pulling from the extension are being
-built next; see [docs/hub-plan.md](docs/hub-plan.md).
-
 The hub runs next to your staging site, in Docker:
 
 ```sh
@@ -381,8 +383,15 @@ docker build -f hub/Dockerfile -t margin-hub:1.2.0 .     # from browser-review/
       - margin-data:/data
 ```
 
-Route `/__margin/` to it in your web server, then create a link per customer
-and a token per developer, from inside the container:
+Route `/__margin/` to it in your web server, and add one line to your staging
+site (not to production):
+
+```html
+<script src="/__margin/margin.js" defer></script>
+```
+
+It does nothing for normal visitors. Then create a link per customer and a token
+per developer, from inside the container:
 
 ```sh
 docker compose exec margin margin token add --reviewer "Anna (client)" --expires 30
@@ -397,8 +406,48 @@ docker compose exec margin margin token revoke "Anna (client)"
 - The feedback stays on your server, in a volume outside the webroot. Nothing
   goes to a third party.
 
+**The customer** opens their link and is welcomed by name ("Hi Milan!", from the
+token's name), with the three steps and their keys. Then the same toolbar you know,
+in the Margin colors: pick an element and comment on it or ask to remove it, or
+comment on the whole page, with a screenshot each time (customers can't edit text
+or CSS). **Alt+C** opens and closes their comments, where they see your replies and
+accept or reopen. **Overview** shows every page they looked at with what they said
+where, and **Export PDF** saves it all. The link only works on your staging site;
+the toolbar's ✕ hides it and **Feedback** brings it back. Change the welcome text
+with `MARGIN_WELCOME` (use `{name}` for theirs).
+
+**You** add the project once on the extension's help page (**Customer feedback
+from staging**): the hub URL and your developer token. The extension pulls every 5
+minutes; in the sidebar pick the project at the top and press **Pull feedback**
+for new feedback now. Customer feedback shows who wrote it, and your agent works on
+it as usual. Only the customer accepts, reopens or deletes.
+
+**Nothing your agent does reaches the customer until you send it.** Its *In
+progress*, *Review ready* and notes stay in your extension (marked **Not sent**,
+with what the customer sees now). When you have deployed to staging, press **Send
+to customer…**: for each comment pick **Fixed** (review ready) or **More feedback
+needed** (a question, it stays in progress), and write what the customer reads; the
+agent's note is only the suggestion. **Discard agent updates** drops them. Your own
+replies to a customer go out right away.
+
+**Your agent** finds it with the same tools. Put the project name in your repo, and
+"check the review comments" goes to that project's feedback (pulled first):
+
+```sh
+mkdir -p .margin && echo '{ "project": "acme-shop" }' > .margin/project.json
+```
+
+The file holds no secrets: the token stays in the extension. The hub also writes
+`site-map.md` next to the feedback: every page reviewers opened, who looked, and the
+comment files per page.
+
+**Overview** (in the sidebar, for your own sites too) opens the feedback overview:
+the site as a tree of pages, with the feedback per page by status, who visited it,
+and the pages that were looked at without feedback. Filter by person and status;
+**Export PDF** opens the print dialog (Save as PDF).
+
 Setup, the nginx rule, the API and where each file lives:
-[hub/README.md](hub/README.md).
+[hub/README.md](hub/README.md). Try it locally with the demo: [Development](#development).
 
 ## Where the data lives
 
@@ -445,7 +494,24 @@ boxes without browser APIs; `extension/src/crop.ts` draws them to PNG.
 
 The review hub is its own package in `hub/` (see [hub/README.md](hub/README.md)):
 `pnpm --dir hub test`, `pnpm build:hub`, and the image with
-`docker build -f hub/Dockerfile -t margin-hub .`.
+`docker build -f hub/Dockerfile -t margin-hub .`. The customer toolbar
+(`margin.js`) is the extension's overlay with another `Host`
+(`extension/src/embed/`): it talks to the hub, takes screenshots with
+html-to-image, and `pnpm build:hub` builds it into the hub. The extension's side
+of projects is `extension/src/sync.ts` (pull, and pushing status changes to the
+hub first) and `hub-client.ts`.
+
+Try the whole flow locally: start the hub with the demo's compose file, then the
+demo as a staging site with `pnpm demo:hub` (it proxies `/__margin/` and loads
+`margin.js`). The hub's data is the folder `demo/.margin/` (not committed), so you
+see each comment appear as Markdown and PNG in `demo/.margin/feedback/` while you test:
+
+```sh
+docker compose -f demo/docker-compose.yml up -d --build
+pnpm demo:hub
+docker compose -f demo/docker-compose.yml exec margin margin token add --reviewer "Test"   # open the link it prints
+docker compose -f demo/docker-compose.yml exec margin margin token add --developer "You"  # add the project on the help page
+```
 
 ### Run the extension from source (hot reload)
 
@@ -528,7 +594,7 @@ Run these before committing (CI runs the same):
 ```sh
 pnpm typecheck
 pnpm test               # all tests (the MCP one runs it over stdio like Claude Code)
-pnpm build              # extension/dist, extension/dist-firefox, server/dist/cli.js, hub/dist/hub.js
+pnpm build              # extension/dist, extension/dist-firefox, server/dist/cli.js, hub/dist/hub.js + margin.js
 ```
 
 ## License

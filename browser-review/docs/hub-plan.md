@@ -24,9 +24,70 @@ overlay (same Preact UI) ──fetch──────►  Store over FsDb → /
 
 ## Progress
 
-- **Done:** step 0 (zebwithb's PRs #2–#6, merged with attribution on branch `zeb-prs`, plus a fix for #4's per-frame text scan), step 1 (Store and formatComment in `shared/`, `Message.name`), step 2 (the hub, its tests and the Docker image; see `hub/README.md`).
-- **Next:** step 3 (the staging overlay `margin.js`), step 4 (projects in the extension), step 5 (MCP project support).
-- Differences from the plan below: `Comment.project`/`remoteId` and `shared/src/hub.ts` come with step 4; the hub image uses Node 26 (as `.nvmrc`), installs pnpm with npm (Node 26 has no corepack), and a `deletions.json` lets developers drop comments a customer deleted.
+- **Done:** steps 0 to 5. Tested end to end: margin.js on the demo in a clean browser (comment, pick, edit, screenshots, polling, accept), the built extension in Chrome for Testing (add project, pull, reply, refusals, side panel), and an agent over MCP in a private network namespace (list_projects, list_comments from `.margin/project.json`, start_work, reply and submit_solution reaching the hub).
+- Differences from the plan:
+  - The hub image uses Node 26 and installs pnpm with npm (Node 26 has no corepack). A `deletions.json` lets developers drop comments a customer deleted.
+  - No `shared/src/hub.ts`: the hub client is `extension/src/hub-client.ts`; the request shapes are the hub's validate.ts.
+  - The extension already has host permission for all sites, so Chrome asks nothing when adding a project; Firefox asks for the hub's origin.
+  - A review link in a tab wins over the developer's extension overlay (`data-margin-review` on `<html>`).
+  - The developer can reply to customer feedback (it goes to the hub as their token's name), but not accept, reopen or delete it.
+  - "Threads" is now "Comments" in the UI, and the UI uses the Margin colors.
+- Not done: **Download as Markdown** in the sidebar (the hub's volume already has the `.md` files).
+- Also built: the developer decides what the customer sees (next section; sending is per comment **Fixed** or **More feedback needed**, in the developer's words), the overview with a site map and PDF export ([overview-plan.md](overview-plan.md)), the customer's welcome (`MARGIN_WELCOME`), no Edit for customers, and Alt+C for the comments.
+
+## Change: the developer decides what the customer sees (built)
+
+Today the agent's `start_work`, `reply` and `submit_solution` on customer feedback go
+to the hub at once, so the customer sees *In progress* and *Review ready* (and the
+agent's notes) the moment the agent says so. That is too early: the fix is only on the
+developer's machine, not on staging yet, and the agent's wording may not be meant for
+a customer.
+
+New rule: **nothing the agent does on customer feedback reaches the customer until the
+developer sends it.**
+
+### How it works
+
+- **Agent actions stay local.** On a copy of customer feedback, `start_work`, `reply`
+  and `submit_solution` change the local copy (the developer and the agent see the new
+  status as usual) and are queued in the copy's outbox:
+  ```ts
+  // Comment, on copies from a hub
+  remote?: Comment;          // the hub's version at the last pull: what the customer sees
+  outbox?: HubAction[];      // agent actions not sent yet, in order
+  ```
+  The local copy is always `remote` with the outbox applied (the same rules, `decide`).
+- **The developer sends.** In the sidebar, such a comment shows **Not sent** and what
+  the customer still sees ("Customer sees: Open"). Buttons:
+  - **Send to customer** on one comment: replays its outbox on the hub in order, then
+    takes the hub's answer.
+  - **Send all (3)** next to Pull feedback: for after a deploy to staging.
+  - **Edit before sending**: the queued replies and the solution note can be changed
+    or dropped first (the agent writes for the developer, the customer may need other words).
+  - **Discard**: drops the outbox; the copy goes back to what the customer sees.
+- **The developer's own replies**, typed in the sidebar, go to the hub at once: pressing
+  Send is the decision. (Open question: or also through the outbox?)
+- **Pulls keep the outbox.** A pull updates `remote`, then applies the outbox again. When
+  a queued action no longer fits (the customer deleted or accepted it meanwhile), it is
+  dropped and the comment says so.
+- **The agent is told.** `start_work` / `submit_solution` on customer feedback answer
+  "#12 is review ready here; the customer sees it once you send it (sidebar: Send to
+  customer)". `get_comment` shows both statuses. The MCP gets no tool to send: only the
+  developer sends.
+- **Per project setting** "Send agent updates right away" (off by default) for teams who
+  deploy on every change and want today's behaviour.
+
+### Where it changes code
+
+- `shared/src/index.ts`: `Comment.remote`, `Comment.outbox`.
+- `extension/src/sync.ts`: `queueAction` (local only), `sendOutbox` (replay on the hub),
+  pull merges `remote` and re-applies the outbox; `pushToHub` only for the developer's
+  own replies and for sending.
+- `extension/src/background.ts`: agent calls on copies queue instead of push; new store
+  ops `send`, `sendAll`, `discard`, `editOutbox`.
+- `Sidebar.tsx`: Not sent badge, "Customer sees", Send / Send all / Discard / edit.
+- `server/src/mcp.ts`: tool answers say it is not sent yet.
+- Tests: queue, send in order, pull with a pending outbox, a dropped action, discard.
 
 ## Step 0: base from zebwithb's PRs
 
