@@ -5,6 +5,7 @@ export { ReviewError, decide, checkCreate, canDelete, checkPngDataUrl, type Revi
 export { cropBox } from './crop.ts';
 export { Store, MemoryDb, isWebUrl, type Db, type StoredShot, type Counter, type ListFilter } from './store.ts';
 export { formatComment, formatListLine } from './format.ts';
+export { buildSiteMap, formatSiteMap, mergeVisit, type SiteNode } from './site-map.ts';
 
 export const STATUSES = ['open', 'in_progress', 'review_ready', 'accepted'] as const;
 export type Status = (typeof STATUSES)[number];
@@ -79,6 +80,8 @@ export interface ScreenshotMeta {
   kind: ScreenshotKind;
   source: ScreenshotSource;
   createdAt: string;
+  /** On a copy pulled from a review hub: the screenshot's id on the hub. */
+  remoteId?: number;
 }
 
 export interface Comment {
@@ -100,6 +103,51 @@ export interface Comment {
   screenshots: ScreenshotMeta[];
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set on a copy pulled from a margin review hub (customer feedback on staging):
+   * the extension's id of that project. The hub owns it; status changes go there first.
+   */
+  project?: string;
+  /** The comment's id on that hub. */
+  remoteId?: number;
+  /**
+   * On a copy with an outbox: the hub's version, what the customer sees now. The
+   * copy itself is this plus the outbox applied (what the developer and agent see).
+   */
+  remote?: Comment;
+  /** On a copy: the agent's updates the developer has not sent to the customer yet, in order. */
+  outbox?: OutboxAction[];
+}
+
+/** An agent update on customer feedback, kept until the developer sends it. */
+export type OutboxAction =
+  | { type: 'start_work' }
+  | { type: 'reply'; message: string }
+  | { type: 'submit_solution'; note: string; files: string[] };
+
+/**
+ * What the developer sends to the customer for one comment: fixed (review ready
+ * with this note) or more feedback needed (this question; it stays in progress).
+ */
+export interface SendDecision {
+  id: number;
+  decision: 'fixed' | 'question';
+  message: string;
+}
+
+/** A page someone looked at with the toolbar on. Path, title and time only: no query, no clicks. */
+export interface PageVisit {
+  origin: string;
+  /** As pageKey(): no query string, no trailing slash. */
+  path: string;
+  /** The latest title. */
+  title: string;
+  /** The token name on a hub; "You" in the extension. */
+  by: string;
+  firstAt: string;
+  lastAt: string;
+  /** Page views, at most one per minute counted. */
+  count: number;
 }
 
 /** Screenshots travel as PNG data URLs ("data:image/png;base64,..."). */
@@ -127,7 +175,8 @@ export interface CreateCommentInput {
 
 /** Every call the MCP process can make, with its params and result. */
 export interface BridgeCalls {
-  list: { params: { statuses: Status[]; origin?: string }; result: Comment[] };
+  /** project: only that review-hub project (by name); null: only local comments, not from any hub. */
+  list: { params: { statuses: Status[]; origin?: string; project?: string | null }; result: Comment[] };
   get: { params: { id: number }; result: Comment };
   screenshot: {
     params: { id: number; kind: ScreenshotKind; which: 'latest' | 'initial' };
@@ -140,6 +189,35 @@ export interface BridgeCalls {
   start_work: { params: { id: number }; result: Comment };
   reply: { params: { id: number; message: string }; result: Comment };
   submit_solution: { params: { id: number; note: string; files: string[] }; result: Comment };
+  /** Review-hub projects added in the extension. Since 1.3; older extensions don't answer it. */
+  projects: { params: Record<string, never>; result: ProjectSummary[] };
+  /** Pulls new customer feedback from the hubs (one project by name, or all). Since 1.3. */
+  pull: { params: { project?: string }; result: PullSummary[] };
+}
+
+/** A margin review hub project, as the extension knows it. Never holds the token. */
+export interface ProjectSummary {
+  /** The extension's id for it (Comment.project). */
+  id: string;
+  /** From the hub (MARGIN_PROJECT), for example "acme-shop". */
+  name: string;
+  /** The staging site, for example "https://staging.acme.com". */
+  origin: string;
+  hubUrl: string;
+  /** The name of the developer token in use. */
+  you: string;
+  lastPull: string | null;
+  /** Why the last pull failed, or null. */
+  lastError: string | null;
+}
+
+export interface PullSummary {
+  project: string;
+  added: number;
+  updated: number;
+  removed: number;
+  /** Set when this project's pull failed; the counts are then 0. */
+  error: string | null;
 }
 export type BridgeMethod = keyof BridgeCalls;
 

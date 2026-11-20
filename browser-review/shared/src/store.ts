@@ -6,6 +6,7 @@ import {
   type Author,
   type Comment,
   type CreateCommentInput,
+  type OutboxAction,
   type ScreenshotKind,
   type ScreenshotMeta,
   type ScreenshotSource,
@@ -27,6 +28,8 @@ export interface ListFilter {
   origin?: string;
   path?: string;
   statuses?: Status[];
+  /** A project id: only copies pulled from that hub. null: only local comments. */
+  project?: string | null;
 }
 
 export interface StoredShot {
@@ -119,7 +122,14 @@ export class Store {
       .filter((c) => !filter.origin || c.origin === filter.origin)
       .filter((c) => !filter.path || c.path === filter.path)
       .filter((c) => !filter.statuses?.length || filter.statuses.includes(c.status))
+      .filter((c) => filter.project === undefined || (c.project ?? null) === filter.project)
       .sort((a, b) => a.id - b.id);
+  }
+
+  /** The local copy of a hub comment, or null. */
+  async findRemote(project: string, remoteId: number): Promise<Comment | null> {
+    const all = await this.#db.allComments();
+    return all.find((c) => c.project === project && c.remoteId === remoteId) ?? null;
   }
 
   // ---------- writing ----------
@@ -182,6 +192,91 @@ export class Store {
     return this.#act(id, { type: 'reopen', body }, by);
   }
 
+  // ---------- copies of review-hub comments ----------
+
+  /**
+   * Stores the hub's version of a comment as the local copy (new, or replacing the
+   * old one), keeping its local id. shots: data URLs of the hub's screenshots the
+   * copy doesn't have yet, by hub screenshot id; findRemote tells which those are.
+   * Screenshots without data are left out (a later pull brings them).
+   */
+  importRemote(
+    project: string,
+    remote: Comment,
+    shots: ReadonlyMap<number, string> = new Map(),
+    opts: { clearOutbox?: boolean } = {},
+  ): Promise<{ comment: Comment; added: boolean; changed: boolean }> {
+    return this.#write(async () => {
+      const existing = (await this.#db.allComments()).find((c) => c.project === project && c.remoteId === remote.id);
+      const id = existing?.id ?? (await this.#db.nextId('comment'));
+      const screenshots: ScreenshotMeta[] = [];
+      for (const s of remote.screenshots) {
+        const have = existing?.screenshots.find((e) => e.remoteId === s.id);
+        if (have) {
+          screenshots.push(have);
+          continue;
+        }
+        const dataUrl = shots.get(s.id);
+        if (!dataUrl) continue;
+        const shotId = await this.#db.nextId('shot');
+        await this.#db.putShot({ id: shotId, commentId: id, dataUrl: checkPngDataUrl(dataUrl) });
+        screenshots.push({ id: shotId, kind: s.kind, source: s.source, createdAt: s.createdAt, remoteId: s.id });
+      }
+      const { project: _p, remoteId: _r, remote: _rm, outbox: _o, ...rest } = remote;
+      let c: Comment = { ...rest, id, screenshots, project, remoteId: remote.id };
+      // Updates the developer has not sent yet stay, on top of the hub's version.
+      const outbox = opts.clearOutbox ? [] : (existing?.outbox ?? []);
+      if (outbox.length) c = await this.#withOutbox(c, outbox, existing?.messages ?? []);
+      // The whole comment, not just updatedAt: two changes can share a millisecond.
+      const changed = !existing || JSON.stringify(existing) !== JSON.stringify(c);
+      if (changed) await this.#db.putComment(c);
+      return { comment: changed ? c : existing, added: !existing, changed };
+    });
+  }
+
+  /**
+   * An agent update on a copy of customer feedback: applied here (the developer and
+   * the agent see it) and kept in the outbox until the developer sends it.
+   */
+  queueOutbox(id: number, action: OutboxAction, by?: string): Promise<Comment> {
+    return this.#update(id, async (c) => {
+      if (!c.project) throw new ReviewError('bad_input', `Comment #${id} is not customer feedback.`);
+      c.remote ??= Store.#snapshot(c);
+      await this.#apply(c, action, now(), by);
+      c.outbox = [...(c.outbox ?? []), action];
+    });
+  }
+
+  /** Drops the unsent updates: the copy goes back to what the customer sees. */
+  discardOutbox(id: number): Promise<Comment> {
+    return this.#write(async () => {
+      const c = await this.mustGet(id);
+      if (!c.remote) return c;
+      const back: Comment = { ...c.remote, id: c.id, project: c.project, remoteId: c.remoteId, screenshots: c.screenshots };
+      await this.#db.putComment(back);
+      return back;
+    });
+  }
+
+  /** Drops the local copy of a hub comment (the customer deleted it). False when there was none. */
+  deleteRemote(project: string, remoteId: number): Promise<boolean> {
+    return this.#write(async () => {
+      const c = (await this.#db.allComments()).find((x) => x.project === project && x.remoteId === remoteId);
+      if (!c) return false;
+      await this.#db.deleteComment(c.id);
+      return true;
+    });
+  }
+
+  /** Drops every copy from one hub project (the project was removed). Returns how many. */
+  deleteProject(project: string): Promise<number> {
+    return this.#write(async () => {
+      const copies = (await this.#db.allComments()).filter((c) => c.project === project);
+      for (const c of copies) await this.#db.deleteComment(c.id);
+      return copies.length;
+    });
+  }
+
   delete(id: number): Promise<void> {
     return this.#write(async () => {
       await this.mustGet(id);
@@ -235,6 +330,59 @@ export class Store {
       c.solution = outcome.solution;
       for (const message of outcome.messages) await this.#message(c, message.author, message.body, t, by);
     });
+  }
+
+  /** A copy as the customer sees it: without our own outbox fields. */
+  static #snapshot(c: Comment): Comment {
+    const { remote: _r, outbox: _o, ...rest } = structuredClone(c);
+    return rest;
+  }
+
+  /** Applies an outbox action. Its messages get negative ids: they only exist here, never on the hub. */
+  async #apply(c: Comment, a: OutboxAction, t: string, by?: string): Promise<void> {
+    const action: Action = a.type === 'reply' ? { type: 'message', author: 'claude', body: a.message } : a;
+    const outcome = decide(c, action, t);
+    c.status = outcome.status;
+    c.solution = outcome.solution;
+    for (const message of outcome.messages) {
+      await this.#message(c, message.author, message.body, t, by);
+      const m = c.messages.at(-1)!;
+      m.id = -Math.abs(m.id);
+    }
+  }
+
+  /**
+   * base (the hub's version) with the outbox applied again. The messages the outbox
+   * made keep their ids and times. Updates that no longer fit (the customer accepted
+   * or deleted it meanwhile) are dropped, and the thread says so.
+   */
+  async #withOutbox(base: Comment, outbox: OutboxAction[], before: Comment['messages']): Promise<Comment> {
+    const c: Comment = { ...structuredClone(base), remote: Store.#snapshot(base) };
+    // Our own earlier local messages (negative ids, never on the hub), oldest first, to reuse their ids and times.
+    const local = before.filter((m) => m.id < 0);
+    const kept: OutboxAction[] = [];
+    let dropped = 0;
+    for (const a of outbox) {
+      const n = c.messages.length;
+      try {
+        await this.#apply(c, a, now());
+      } catch {
+        dropped++;
+        continue;
+      }
+      kept.push(a);
+      // Give the new messages back their first ids and times, so a pull doesn't renumber them.
+      for (let i = n; i < c.messages.length; i++) {
+        const old = local.shift();
+        if (old && old.body === c.messages[i]!.body) c.messages[i] = { ...c.messages[i]!, id: old.id, createdAt: old.createdAt, ...(old.name ? { name: old.name } : {}) };
+      }
+    }
+    if (dropped) {
+      await this.#message(c, 'system', `${dropped} unsent update(s) were dropped: the customer changed this comment meanwhile.`, now());
+    }
+    if (kept.length) c.outbox = kept;
+    else delete c.remote;
+    return c;
   }
 
   async #shot(c: Comment, kind: ScreenshotKind, source: ScreenshotSource, dataUrl: string): Promise<ScreenshotMeta> {

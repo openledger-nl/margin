@@ -12,7 +12,8 @@ export function formatListLine(c: Comment): string {
   const where = c.target
     ? `on <${c.target.tag}> ${quote(c.target.text, 40)}${c.target.components.length ? ` in ${c.target.components.at(-1)}` : ''}`
     : 'on the whole page';
-  return `#${c.id} [${STATUS_LABELS[c.status]}] ${KIND_LABELS[c.kind]} ${where}, ${c.origin}${c.path}: ${quote(userMsg?.body ?? '', 90)}`;
+  const from = c.project ? ` (customer feedback${userMsg?.name ? ` from ${userMsg.name}` : ''}${c.outbox?.length ? ', not sent yet' : ''})` : '';
+  return `#${c.id} [${STATUS_LABELS[c.status]}] ${KIND_LABELS[c.kind]} ${where}, ${c.origin}${c.path}${from}: ${quote(userMsg?.body ?? '', 90)}`;
 }
 
 /** Full detail for get_comment, written for an agent that has to fix it in code. */
@@ -24,6 +25,12 @@ export function formatComment(c: Comment): string {
   out.push(`Title: ${c.title || '(none)'}`);
   out.push(`Viewport: ${c.viewport.width}x${c.viewport.height} at ${c.viewport.dpr}x`);
   out.push(`Created: ${c.createdAt}, updated: ${c.updatedAt}`);
+  if (c.project) {
+    out.push(
+      'Source: customer feedback on the staging site, pulled from a margin review hub. Fix it in this code base as usual. Your start_work, reply and submit_solution wait for the developer, who sends them to the customer after deploying to staging; the customer accepts or reopens it there. capture_screenshot only works with the staging page open in the browser.',
+    );
+    if (c.remote) out.push(`The customer sees: ${STATUS_LABELS[c.remote.status]} (${c.outbox?.length ?? 0} update(s) not sent yet).`);
+  }
 
   if (c.target) {
     const t = c.target;
@@ -97,5 +104,6 @@ function nextStepHint(c: Comment): string {
 
 function author(m: Message): string {
   const role = m.author === 'user' ? 'User' : m.author === 'claude' ? 'Agent' : 'Status';
-  return m.name ? `${role} (${m.name})` : role;
+  // Quoted: names often have brackets of their own, like "Anna (client)".
+  return m.name ? `${role} ${JSON.stringify(m.name)}` : role;
 }

@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Comment } from './index.ts';
-import { formatComment } from './format.ts';
+import { formatComment, formatListLine } from './format.ts';
 
 const comment: Comment = {
   id: 3,
@@ -27,7 +27,20 @@ const comment: Comment = {
 describe('formatComment', () => {
   it('shows who wrote a message when its name is known', () => {
     const text = formatComment(comment);
-    assert.match(text, /- User \(Anna \(client\)\) \(2026-11-20T10:00:00.000Z\): Logo too small/);
+    assert.match(text, /- User "Anna \(client\)" \(2026-11-20T10:00:00.000Z\): Logo too small/);
     assert.match(text, /- Agent \(2026-11-20T10:05:00.000Z\): Which size\?/);
+  });
+
+  it('marks customer feedback pulled from a review hub', () => {
+    const copy = { ...comment, project: 'p1', remoteId: 7 };
+    assert.match(formatListLine(copy), /\(customer feedback from Anna \(client\)\)/);
+    assert.match(formatComment(copy), /Source: customer feedback on the staging site/);
+    assert.doesNotMatch(formatComment(comment), /Source:/);
+  });
+
+  it('says when the agent\'s updates are not sent to the customer yet', () => {
+    const copy = { ...comment, project: 'p1', remoteId: 7, status: 'review_ready' as const, remote: comment, outbox: [{ type: 'start_work' as const }] };
+    assert.match(formatListLine(copy), /not sent yet/);
+    assert.match(formatComment(copy), /The customer sees: Open \(1 update\(s\) not sent yet\)/);
   });
 });

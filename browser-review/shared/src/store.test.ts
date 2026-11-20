@@ -177,3 +177,127 @@ describe('who did it', () => {
     assert.equal('name' in local.messages[0]!, false);
   });
 });
+
+describe('copies of review-hub comments', () => {
+  /** A comment as a hub returns it, made in its own store. */
+  async function hubComment(body = 'Logo too small') {
+    const hub = new Store(new MemoryDb());
+    const c = await hub.create({ ...base, url: 'https://staging.acme.com/', body, screenshots: { page: PNG } }, 'Anna (client)');
+    return { hub, c };
+  }
+
+  it('imports a hub comment with a local id, its project and the hub id, and its screenshots', async () => {
+    await store.create(base); // local #1, so the copy gets another id than on the hub
+    const { c } = await hubComment();
+    const shotId = c.screenshots[0]!.id;
+    const { comment, added } = await store.importRemote('p1', c, new Map([[shotId, PNG]]));
+    assert.equal(added, true);
+    assert.equal(comment.id, 2);
+    assert.equal(comment.project, 'p1');
+    assert.equal(comment.remoteId, c.id);
+    assert.equal(comment.screenshots[0]?.remoteId, shotId);
+    assert.equal(await store.readScreenshot(comment.screenshots[0]!.id), PNG);
+    assert.equal(comment.messages[0]?.name, 'Anna (client)');
+  });
+
+  it('updates the same copy on the next pull, and only fetches new screenshots', async () => {
+    const { hub, c } = await hubComment();
+    const first = await store.importRemote('p1', c, new Map([[c.screenshots[0]!.id, PNG]]));
+    const again = await store.importRemote('p1', c);
+    assert.equal(again.changed, false);
+    const replied = await hub.addMessage(c.id, 'user', 'Still small', 'Anna (client)');
+    const second = await store.importRemote('p1', replied);
+    assert.equal(second.added, false);
+    assert.equal(second.comment.id, first.comment.id);
+    assert.equal(second.comment.messages.length, 2);
+    assert.deepEqual(second.comment.screenshots, first.comment.screenshots);
+    assert.equal((await store.list()).length, 1);
+  });
+
+  it('keeps hub copies apart per project and from local comments', async () => {
+    const { c } = await hubComment();
+    await store.importRemote('p1', c);
+    await store.importRemote('p2', c);
+    await store.create(base);
+    assert.equal((await store.list({ project: 'p1' })).length, 1);
+    assert.equal((await store.list({ project: null })).length, 1);
+    assert.equal((await store.list()).length, 3);
+    assert.equal((await store.findRemote('p2', c.id))?.project, 'p2');
+  });
+
+  it('drops a copy the customer deleted, and every copy of a removed project', async () => {
+    const { c } = await hubComment();
+    const other = (await hubComment('Footer')).c;
+    await store.importRemote('p1', c);
+    await store.importRemote('p2', other);
+    assert.equal(await store.deleteRemote('p1', c.id), true);
+    assert.equal(await store.deleteRemote('p1', c.id), false);
+    assert.equal(await store.deleteProject('p2'), 1);
+    assert.equal((await store.list()).length, 0);
+  });
+});
+
+describe('the outbox: agent updates the developer has not sent yet', () => {
+  async function pulled() {
+    const hub = new Store(new MemoryDb());
+    const remote = await hub.create({ ...base, url: 'https://staging.acme.com/', body: 'Logo too small' }, 'Anna (client)');
+    const { comment } = await store.importRemote('p1', remote);
+    return { hub, remote, copy: comment };
+  }
+
+  it('applies agent updates here and keeps what the customer sees', async () => {
+    const { copy } = await pulled();
+    await store.queueOutbox(copy.id, { type: 'start_work' });
+    await store.queueOutbox(copy.id, { type: 'reply', message: 'Note for the developer' });
+    const c = await store.queueOutbox(copy.id, { type: 'submit_solution', note: 'Bigger logo', files: ['src/Logo.tsx'] });
+    assert.equal(c.status, 'review_ready');
+    assert.equal(c.remote?.status, 'open');
+    assert.equal(c.outbox?.length, 3);
+    assert.ok(c.messages.filter((m) => m.author !== 'user').every((m) => m.id < 0), 'local messages have their own ids');
+  });
+
+  it('keeps the outbox over a pull, with the same local messages', async () => {
+    const { hub, remote, copy } = await pulled();
+    const queued = await store.queueOutbox(copy.id, { type: 'reply', message: 'Which logo?' });
+    const replied = await hub.addMessage(remote.id, 'user', 'And the footer', 'Anna (client)');
+    const { comment } = await store.importRemote('p1', replied);
+    assert.deepEqual(comment.outbox, [{ type: 'reply', message: 'Which logo?' }]);
+    assert.equal(comment.remote?.messages.length, 2);
+    assert.deepEqual(
+      comment.messages.map((m) => m.body),
+      ['Logo too small', 'And the footer', 'Which logo?'],
+    );
+    const mine = queued.messages.find((m) => m.body === 'Which logo?')!;
+    assert.equal(comment.messages.at(-1)?.id, mine.id);
+  });
+
+  it('drops updates that no longer fit after the customer changed it, and says so', async () => {
+    const { hub, remote, copy } = await pulled();
+    await store.queueOutbox(copy.id, { type: 'start_work' });
+    await hub.submitSolution(remote.id, 'done elsewhere', []);
+    const accepted = await hub.accept(remote.id);
+    const { comment } = await store.importRemote('p1', accepted);
+    assert.equal(comment.outbox, undefined);
+    assert.equal(comment.status, 'accepted');
+    assert.match(comment.messages.at(-1)!.body, /dropped/);
+  });
+
+  it('clears the outbox once sent, and discard goes back to what the customer sees', async () => {
+    const { hub, remote, copy } = await pulled();
+    await store.queueOutbox(copy.id, { type: 'start_work' });
+    const back = await store.discardOutbox(copy.id);
+    assert.equal(back.status, 'open');
+    assert.equal(back.outbox, undefined);
+    await store.queueOutbox(copy.id, { type: 'start_work' });
+    const sent = await hub.startWork(remote.id, 'Andor');
+    const { comment } = await store.importRemote('p1', sent, new Map(), { clearOutbox: true });
+    assert.equal(comment.outbox, undefined);
+    assert.equal(comment.remote, undefined);
+    assert.equal(comment.status, 'in_progress');
+  });
+
+  it('only queues on customer feedback', async () => {
+    const local = await store.create(base);
+    assert.equal(await code(store.queueOutbox(local.id, { type: 'start_work' })), 'bad_input');
+  });
+});
