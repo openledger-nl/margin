@@ -132,7 +132,7 @@ function PanelApp({ windowId }: { windowId: number }) {
     return () => chrome.storage.onChanged.removeListener(onChange);
   }, []);
 
-  // The extension icon or Alt+Shift+T closes us through the background.
+  // The extension icon or Alt+C closes us through the background.
   useEffect(() => {
     const onMessage = (req: PanelRequest) => {
       if (req.type === 'panel-close' && req.windowId === windowId) close();
@@ -144,7 +144,7 @@ function PanelApp({ windowId }: { windowId: number }) {
 
   if (!allowed || !tab) {
     return (
-      <aside class="brm-ui brm-sidebar is-docked" aria-label="Review threads">
+      <aside class="brm-ui brm-sidebar is-docked" aria-label="Review comments">
         <header class="brm-side-head">
           <strong>Review</strong>
           <span class="brm-spacer" />
@@ -165,6 +165,7 @@ function PanelApp({ windowId }: { windowId: number }) {
       docked
       comments={comments}
       path={path}
+      origin={origin}
       connected={connected}
       focusId={loaded ? focusId : null}
       onClose={close}
@@ -223,7 +224,7 @@ function NotHere({ tab, settings }: { tab: ActiveTab | null; settings: SiteSetti
   return (
     <div class="brm-panel-empty">
       <strong>Open your app in this tab</strong>
-      <p>Its threads show here. Margin Browser Review runs on web pages, not on browser pages like this one.</p>
+      <p>Its comments show here. Margin Browser Review runs on web pages, not on browser pages like this one.</p>
     </div>
   );
 }

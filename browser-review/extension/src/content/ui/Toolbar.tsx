@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useHost } from '../host.ts';
+import { Mark } from './Mark.tsx';
 
 interface Props {
   connected: boolean;
@@ -31,16 +33,20 @@ function useBump(n: number): boolean {
 
 export function Toolbar(p: Props) {
   const openBumped = useBump(p.openCount);
+  const review = useHost().mode === 'review';
+  const dotTitle = review
+    ? p.connected
+      ? 'Connected: your feedback goes straight to the developers'
+      : "Can't reach the review server right now. Try again in a moment."
+    : p.connected
+      ? 'A coding agent is connected'
+      : 'No coding agent is connected. Your comments are saved; your agent sees them when a session with browser-review runs. Click ? for setup.';
   return (
-    <div class="brm-ui brm-toolbar" role="toolbar" aria-label="Margin Browser Review">
-      <span
-        class={`brm-dot ${p.connected ? 'is-on' : 'is-off'}`}
-        title={
-          p.connected
-            ? 'A coding agent is connected'
-            : 'No coding agent is connected. Your comments are saved; your agent sees them when a session with browser-review runs. Click ? for setup.'
-        }
-      />
+    <div class="brm-ui brm-toolbar" role="toolbar" aria-label={review ? 'Margin feedback' : 'Margin Browser Review'}>
+      <span class="brm-brand" title={dotTitle}>
+        <Mark />
+        <span class={`brm-dot ${p.connected ? 'is-on' : 'is-off'}`} />
+      </span>
       <button class={`brm-tool ${p.picking ? 'is-active' : ''}`} onClick={p.onPick} title="Pick an element to comment on, remove or edit (Alt+Shift+P)">
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path d="M3 2l9 4.5-4 1.2L6.8 12z" />
@@ -53,15 +59,23 @@ export function Toolbar(p: Props) {
         </svg>
         Page comment
       </button>
-      <button class={`brm-tool ${p.sidebarOpen ? 'is-active' : ''}`} onClick={p.onToggleSidebar} title="Open or close the threads (Alt+Shift+T)">
-        Threads
+      <button class={`brm-tool ${p.sidebarOpen ? 'is-active' : ''}`} onClick={p.onToggleSidebar} title="Open or close the comments (Alt+C)">
+        Comments
         {p.openCount > 0 && <span class={`brm-count ${openBumped ? 'is-bumped' : ''}`}>{p.openCount}</span>}
         {p.reviewCount > 0 && <span class="brm-count st-review_ready" title="Review ready">{p.reviewCount}</span>}
       </button>
-      <button class="brm-icon-btn" onClick={p.onHelp} title="Help: setup and how to use">
+      <button class="brm-icon-btn" onClick={p.onHelp} title={review ? 'Help: how to give feedback' : 'Help: setup and how to use'}>
         ?
       </button>
-      <button class="brm-icon-btn" onClick={p.onHide} title="Hide the overlay (Alt+Shift+R or the extension icon brings it back)">
+      <button
+        class="brm-icon-btn"
+        onClick={p.onHide}
+        title={
+          review
+            ? 'Hide the toolbar (the Feedback button or Alt+Shift+R brings it back)'
+            : 'Hide the overlay (Alt+Shift+R or the extension icon brings it back)'
+        }
+      >
         ✕
       </button>
     </div>

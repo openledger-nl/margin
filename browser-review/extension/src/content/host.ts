@@ -2,14 +2,23 @@
 // HostContext; each entry (content script, side panel) creates its own host.
 import { createContext } from 'preact';
 import { useCallback, useContext, useEffect, useState } from 'preact/hooks';
-import type { Comment, CreateCommentInput, Rect, ScreenshotUpload } from '@brm/shared';
-import type { PanelState, PortEvent, TabRequest } from '../messages.ts';
+import type { Comment, CreateCommentInput, ProjectSummary, PullSummary, Rect, ScreenshotUpload, SendDecision } from '@brm/shared';
+import type { PanelState, PortEvent, SendResult, TabRequest } from '../messages.ts';
 
-/** What the overlay needs from where it runs: today the extension. */
+/** What the overlay needs from where it runs: the extension, or margin.js on a staging site. */
 export interface Host {
+  /**
+   * developer (default): the extension, with a coding agent behind it.
+   * review: margin.js on a staging site, for customers, with a hub behind it.
+   */
+  readonly mode?: 'developer' | 'review';
+  /** review: the name of the review token in use, so the overlay knows which messages are "You". */
+  readonly me?: string | null;
   readonly comments: CommentApi;
+  /** Review-hub projects (customer feedback from staging). Only in the extension. */
+  readonly projects?: ProjectApi;
   readonly settings: Settings;
-  /** The browser's side panel for threads. Null: threads show in the overlay's own Sidebar. */
+  /** The browser's side panel for the comments. Null: they show in the overlay's own Sidebar. */
   readonly panel: Panel | null;
   /** What the user sees, plus a crop around rect (viewport CSS px). Undefined when it failed: the comment goes without. */
   capture(rect: Rect | null): Promise<ScreenshotUpload | undefined>;
@@ -22,6 +31,14 @@ export interface Host {
    */
   onRequest(handler: (req: TabRequest) => unknown): () => void;
   openHelp(section?: string): void;
+  /** The overview page with the site map, for a site or a project. */
+  openOverview?(target: { origin?: string; project?: string }): void;
+  /** A page was opened (load or SPA navigation), for the site map. */
+  recordVisit?(url: string, title: string): void;
+  /** review: the first visit's welcome text from the hub, or null for the default. */
+  readonly welcome?: string | null;
+  /** review: the hub's project name, for the welcome. */
+  readonly project?: string | null;
   /** False once the host can't be reached anymore (the extension was reloaded). */
   alive(): boolean;
 }
@@ -36,6 +53,16 @@ export interface CommentApi {
   remove(id: number): Promise<void>;
   /** An image URL for a stored screenshot (data: or blob:), or null. */
   screenshot(shotId: number): Promise<string | null>;
+}
+
+export interface ProjectApi {
+  list(): Promise<ProjectSummary[]>;
+  /** One project, or all. Resolves with a summary per project; a failed one has its error. */
+  pull(id?: string): Promise<PullSummary[]>;
+  /** Sends the developer's decisions on customer feedback to the customer. */
+  send(decisions: SendDecision[]): Promise<SendResult[]>;
+  /** Drops a comment's unsent agent updates. */
+  discard(id: number): Promise<Comment>;
 }
 
 export interface Settings {

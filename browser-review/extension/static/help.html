@@ -7,19 +7,24 @@
     <link rel="icon" href="icons/48.png" />
     <style>
       :root {
+        /* Margin colors: green on paper, the dark screen (brand/README.md). */
         --bg: #ffffff;
-        --fg: #1c1d21;
-        --dim: #6b6f78;
-        --line: #e3e4e8;
-        --soft: #f5f5f7;
-        --accent: #5b4cdb;
-        --accent-soft: #eeecfc;
-        --ok: #2b7a4b;
-        --ok-soft: #e7f4ec;
+        --fg: #0e1016;
+        --dim: #646a76;
+        --line: #e4e0d6;
+        --soft: #f4f1ea;
+        --accent: #2f9e6b;
+        --accent-strong: #23805a;
+        --accent-soft: #e2f3ea;
+        --ok: #2f9e6b;
+        --ok-soft: #e2f3ea;
         --warn: #7a4a10;
-        --warn-soft: #fbf1e6;
+        --warn-soft: #fbf0dc;
         --open: #2f6fdb;
-        --progress: #a86512;
+        --progress: #c27a0e;
+        --review: #7048e8;
+        --error: #b42318;
+        --error-soft: #fef3f2;
       }
       * {
         box-sizing: border-box;
@@ -140,12 +145,26 @@
         border-bottom: 1px solid var(--line);
       }
       select {
-        font: inherit;
-        padding: 3px 6px;
+        appearance: none;
+        -webkit-appearance: none;
+        height: 36px;
+        padding: 0 34px 0 12px;
         border: 1px solid var(--line);
-        border-radius: 6px;
-        background: var(--bg);
+        border-radius: 8px;
+        background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2323805a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center / 12px 12px;
         color: inherit;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(14, 16, 22, 0.06);
+      }
+      select:hover {
+        border-color: #cfc9ba;
+      }
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
       }
       .copy {
         flex: none;
@@ -157,7 +176,68 @@
         font-weight: 500;
       }
       .copy:hover {
-        background: #4a3cc4;
+        background: var(--accent-strong);
+      }
+      .copy:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .project-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 10px;
+        align-items: end;
+        margin: 12px 0;
+      }
+      .project-form label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .project-form input {
+        font: 14px/1.4 system-ui, sans-serif;
+        padding: 7px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-width: 0;
+      }
+      .project-form input:focus {
+        outline: 2px solid var(--accent-soft);
+        border-color: var(--accent);
+      }
+      .project-form .copy {
+        height: 36px;
+      }
+      @media (max-width: 640px) {
+        .project-form {
+          grid-template-columns: 1fr;
+        }
+      }
+      .error {
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: var(--error-soft);
+        color: var(--error);
+      }
+      .project-list li {
+        flex-wrap: wrap;
+      }
+      .project-list .project-name {
+        font-weight: 600;
+      }
+      .project-list .project-meta {
+        flex: 1 1 100%;
+        font-size: 13px;
+        color: var(--dim);
+      }
+      .project-list .project-meta.is-error {
+        color: var(--error);
+      }
+      .project-list .actions {
+        display: flex;
+        gap: 14px;
       }
       .link-btn {
         border: 0;
@@ -247,7 +327,7 @@
         background: var(--progress);
       }
       .st-review {
-        background: var(--accent);
+        background: var(--review);
       }
       .st-accepted {
         background: var(--ok);
@@ -352,7 +432,7 @@
               <li><strong>Remove</strong>: the element disappears right away (preview), your agent removes it in the code.</li>
               <li><strong>Edit</strong>: change its texts or add CSS with a live preview, your agent makes the same change.</li>
             </ul>
-            After sending, the <strong>Threads</strong> count goes up; tick <strong>Open thread</strong> in the box to see the new thread in the sidebar instead (it remembers your choice). Need more room to write? Drag the box's bottom-right corner; it remembers the size. The Threads sidebar is the browser's side panel: drag its edge to make it wider. If the <strong>Threads</strong> button can't open it, use the extension icon or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
+            After sending, the <strong>Comments</strong> count goes up; tick <strong>Show in sidebar</strong> in the box to see the new comment in the sidebar instead (it remembers your choice). Need more room to write? Drag the box's bottom-right corner; it remembers the size. The comments sidebar is the browser's side panel: drag its edge to make it wider. If the <strong>Comments</strong> button can't open it, use the extension icon or <kbd>Alt</kbd>+<kbd>C</kbd>.
           </li>
           <li>Or write a <strong>Page comment</strong> about the whole page.</li>
         </ol>
@@ -373,13 +453,13 @@
           <pre id="ask">Check the review comments.</pre>
           <button class="copy" data-copy="ask">Copy</button>
         </div>
-        <p>The agent lists the comments, marks each one <span class="badge st-progress">In progress</span>, fixes it in the code, and marks it <span class="badge st-review">Review ready</span> with a note on how it solved it. You see this live in the sidebar. Pick which statuses to see under <strong>Show</strong> at the top; <strong>Collapse all</strong> gives an overview.</p>
+        <p>The agent lists the comments, marks each one <span class="badge st-progress">In progress</span>, fixes it in the code, and marks it <span class="badge st-review">Review ready</span> with a note on how it solved it. You see this live in the sidebar. Pick which statuses to see under <strong>Show</strong> at the top. Comments start collapsed as an overview: click one to open it, or <strong>Expand all</strong>.</p>
         <p>More specific: <em>"Fix review comment #12."</em> or <em>"Check the review comments for http://localhost:5173 only."</em></p>
       </section>
 
       <section id="accept">
         <h2><span class="step">4</span>Accept or reopen</h2>
-        <p>In the sidebar, open a thread that is review ready and press <strong>Accept solution</strong>, or write what is still wrong and press <strong>Reopen</strong>.</p>
+        <p>In the sidebar, open a comment that is review ready and press <strong>Accept solution</strong>, or write what is still wrong and press <strong>Reopen</strong>.</p>
         <table>
           <thead>
             <tr><th>Status</th><th>Set by</th><th>Meaning</th></tr>
@@ -391,6 +471,45 @@
             <tr><td><span class="badge st-accepted">Accepted</span></td><td>you</td><td>done</td></tr>
           </tbody>
         </table>
+      </section>
+
+      <section id="projects">
+        <h2>Customer feedback from staging</h2>
+        <p>
+          Customers can comment on your <strong>staging site</strong> through a personal review link, without
+          installing anything. The <strong>margin review hub</strong> runs next to your staging site in Docker and keeps
+          their feedback. Add the project here once with the hub's URL and your developer token: the extension pulls new
+          feedback every 5 minutes, and when you press <strong>Pull feedback</strong> in the sidebar.
+        </p>
+        <form id="project-form" class="project-form">
+          <label>Hub URL <input id="project-hub" placeholder="https://staging.acme.com/__margin/" required autocomplete="off" /></label>
+          <label>Developer token <input id="project-token" type="password" placeholder="mdev_…" required autocomplete="off" /></label>
+          <button class="copy" type="submit" id="project-add">Add project</button>
+        </form>
+        <p id="project-error" class="error" hidden></p>
+        <ul id="project-list" class="site-list project-list"></ul>
+        <p id="no-projects" class="dim" hidden>No projects yet.</p>
+        <p>
+          In the sidebar, pick the project at the top to see its feedback, with who wrote it. Your agent works on it with
+          the same tools, but <strong>nothing it does reaches the customer until you send it</strong>: its updates show
+          <strong>Not sent</strong>. After deploying to staging, press <strong>Send to customer…</strong> and pick per
+          comment <strong>Fixed</strong> or <strong>More feedback needed</strong>, in your own words. The customer accepts
+          or reopens it on staging. <strong>Overview</strong> in the sidebar shows all feedback on a map of the site, and
+          exports a PDF.
+        </p>
+        <p>
+          To let your agent go to that project's feedback by itself, put this in <code>.margin/project.json</code> in your
+          repo (no secrets in it, so commit it):
+        </p>
+        <div class="cmd">
+          <pre id="project-json">{ "project": "acme-shop" }</pre>
+          <button class="copy" data-copy="project-json">Copy</button>
+        </div>
+        <p class="dim">
+          A developer token comes from the staging server:
+          <code>docker compose exec margin margin token add --developer "Your name"</code>. It stays in this browser and is
+          only sent to that hub.
+        </p>
       </section>
 
       <section id="shortcuts">

@@ -6,7 +6,7 @@
   "minimum_chrome_version": "120",
   "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
   "action": {
-    "default_title": "Margin Browser Review: show or hide the threads and the overlay",
+    "default_title": "Margin Browser Review: show or hide the comments and the overlay",
     "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png" }
   },
   "background": { "service_worker": "background.js" },
@@ -28,8 +28,8 @@
       "description": "Comment on the whole page"
     },
     "toggle-threads": {
-      "suggested_key": { "default": "Alt+Shift+T" },
-      "description": "Open or close the threads sidebar"
+      "suggested_key": { "default": "Alt+C" },
+      "description": "Open or close the comments sidebar"
     }
   }
 }

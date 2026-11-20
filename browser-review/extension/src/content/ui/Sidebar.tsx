@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { canDelete, KIND_LABELS, STATUS_LABELS, type Comment, type Status } from '@brm/shared';
+import { canDelete, KIND_LABELS, STATUS_LABELS, type Comment, type Message, type ProjectSummary, type SendDecision, type Status } from '@brm/shared';
+import { suggestDecision } from '../../sync.ts';
 import { useHost, useSetting } from '../host.ts';
 import { describe } from '../targets.ts';
 import { replyDraft } from '../drafts.ts';
 import { useSendKey } from '../hooks.ts';
+import { Mark } from './Mark.tsx';
 import { isSendKey, sendKeyName } from '../../settings.ts';
 
 export type Filter = 'active' | Status | 'all';
@@ -28,6 +30,8 @@ const FILTERS: { key: Filter; label: string; hint?: string; statuses: Status[] }
 interface Props {
   comments: Comment[];
   path: string;
+  /** This site, for the Overview button. */
+  origin?: string;
   connected: boolean;
   focusId: number | null;
   /** In the browser's side panel: fills it, no resize handle (the browser resizes it). */
@@ -48,15 +52,16 @@ function time(iso: string): string {
     : d.toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-/** All threads collapsed (an overview) instead of all expanded. Remembered for all sites. */
+/** All comments collapsed (an overview), the default, or all expanded. Remembered for all sites. */
 const COLLAPSED_KEY = 'threadsOverview';
 
 /**
- * Which threads are open: all expanded by default, or all collapsed, plus the
- * ones the user toggled by hand. New threads follow the current default.
+ * Which comments are open: all collapsed by default, or all expanded, plus the
+ * ones the user toggled by hand. New comments follow the current default.
  */
 function useExpanded() {
-  const [collapsed, setCollapsed] = useSetting(COLLAPSED_KEY, (v) => v === true);
+  // Collapsed unless the user chose Expand all (stored false).
+  const [collapsed, setCollapsed] = useSetting(COLLAPSED_KEY, (v) => v !== false);
   const [toggled, setToggled] = useState<ReadonlySet<number>>(new Set());
   const collapsedRef = useRef(collapsed);
   collapsedRef.current = collapsed;
@@ -141,10 +146,78 @@ function useSidebarWidth(ref: { current: HTMLElement | null }) {
 
 const ORDER: Record<Status, number> = { review_ready: 0, in_progress: 1, open: 2, accepted: 3 };
 
-export function Sidebar({ comments, path, connected, focusId, docked, onClose, onHover, onGoTo, onOpenPage, onChanged }: Props) {
+/** Which comments the sidebar shows: '' this site, or a review-hub project id. Remembered for all sites. */
+const SOURCE_KEY = 'commentsSource';
+/** How often the sidebar refreshes projects and their comments from the extension's store. */
+const PROJECT_REFRESH_MS = 5000;
+
+/** Review-hub projects and the selected one's comments (developer side only). */
+function useProjects(source: string) {
+  const host = useHost();
+  const api = host.mode === 'review' ? undefined : host.projects;
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [pulling, setPulling] = useState(false);
+  const [pullNote, setPullNote] = useState<string | null>(null);
+  const selected = projects.find((p) => p.id === source) ?? null;
+
+  const refresh = async () => {
+    if (!api) return;
+    try {
+      const list = await api.list();
+      setProjects(list);
+      const p = list.find((x) => x.id === source);
+      setComments(p ? (await host.comments.list(p.origin)).filter((c) => c.project === p.id) : []);
+    } catch {
+      // the background is restarting: next round
+    }
+  };
+
+  useEffect(() => {
+    if (!api) return;
+    void refresh();
+    const t = setInterval(() => void refresh(), PROJECT_REFRESH_MS);
+    return () => clearInterval(t);
+  }, [api, source]);
+
+  const pull = async () => {
+    if (!api || !selected) return;
+    setPulling(true);
+    setPullNote(null);
+    try {
+      const [r] = await api.pull(selected.id);
+      if (r && !r.error) {
+        const n = r.added + r.updated + r.removed;
+        setPullNote(n === 0 ? 'Nothing new.' : [r.added && `${r.added} new`, r.updated && `${r.updated} updated`, r.removed && `${r.removed} deleted`].filter(Boolean).join(', '));
+      }
+    } catch (err) {
+      setPullNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPulling(false);
+      await refresh();
+    }
+  };
+
+  return { available: Boolean(api) && projects.length > 0, projects, selected, comments, pull, pulling, pullNote, refresh };
+}
+
+export function Sidebar({ comments, path, origin, connected, focusId, docked, onClose, onHover, onGoTo, onOpenPage, onChanged }: Props) {
   const host = useHost();
   const [scope, setScope] = useState<Scope>('page');
   const [filter, setFilter] = useState<Filter>('active');
+  const [source, setSource] = useSetting(SOURCE_KEY, (v) => (typeof v === 'string' ? v : ''));
+  const projects = useProjects(source);
+  /** A review-hub project is shown instead of this site. */
+  const project = projects.available ? projects.selected : null;
+  const list = project ? projects.comments : comments;
+  /** Customer feedback with agent updates the developer has not sent yet. */
+  const pending = host.mode === 'review' ? [] : list.filter((c) => c.project && c.outbox?.length);
+  /** The Send to customer panel, with these comments. */
+  const [sending, setSending] = useState<Comment[] | null>(null);
+  const afterChange = async () => {
+    await onChanged();
+    await projects.refresh();
+  };
   const expanded = useExpanded();
   const asideRef = useRef<HTMLElement>(null);
   const size = useSidebarWidth(asideRef);
@@ -153,11 +226,12 @@ export function Sidebar({ comments, path, connected, focusId, docked, onClose, o
     if (focusId === null) return;
     const c = comments.find((x) => x.id === focusId);
     expanded.show(focusId);
+    if (c && project) setSource('');
     if (c && c.path !== path) setScope('site');
     if (c && !FILTERS.find((f) => f.key === filter)?.statuses.includes(c.status)) setFilter('all');
   }, [focusId]);
 
-  const inScope = comments.filter((c) => scope === 'site' || c.path === path);
+  const inScope = list.filter((c) => project !== null || scope === 'site' || c.path === path);
   const statuses = FILTERS.find((f) => f.key === filter)?.statuses ?? [];
   const shown = inScope
     .filter((c) => statuses.includes(c.status))
@@ -169,7 +243,7 @@ export function Sidebar({ comments, path, connected, focusId, docked, onClose, o
       ref={asideRef}
       class={`brm-ui brm-sidebar ${docked ? 'is-docked' : ''}`}
       style={docked ? undefined : { width: `${size.width}px` }}
-      aria-label="Review threads"
+      aria-label="Review comments"
     >
       {!docked && (
         <div
@@ -180,22 +254,78 @@ export function Sidebar({ comments, path, connected, focusId, docked, onClose, o
         />
       )}
       <header class="brm-side-head">
-        <strong>Review</strong>
-        <div class="brm-seg">
-          <button class={scope === 'page' ? 'is-active' : ''} onClick={() => setScope('page')}>
-            This page
+        <Mark />
+        <strong>Comments</strong>
+        {!project && (
+          <div class="brm-seg">
+            <button class={scope === 'page' ? 'is-active' : ''} onClick={() => setScope('page')}>
+              This page
+            </button>
+            <button class={scope === 'site' ? 'is-active' : ''} onClick={() => setScope('site')}>
+              Whole site
+            </button>
+          </div>
+        )}
+        {project && <span class="brm-spacer" />}
+        {host.openOverview && (
+          <button
+            class="brm-btn brm-overview-btn"
+            title="All feedback on a map of the site: which pages were looked at, and what was said where. Export as PDF."
+            onClick={() => host.openOverview?.(project ? { project: project.id } : origin ? { origin } : {})}
+          >
+            Overview
           </button>
-          <button class={scope === 'site' ? 'is-active' : ''} onClick={() => setScope('site')}>
-            Whole site
-          </button>
-        </div>
+        )}
         <button class="brm-icon-btn" title="Help" onClick={() => host.openHelp()}>
           ?
         </button>
-        <button class="brm-icon-btn" title="Close (Alt+Shift+T)" onClick={onClose}>
+        <button class="brm-icon-btn" title="Close (Alt+C)" onClick={onClose}>
           ✕
         </button>
       </header>
+      {projects.available && (
+        <div class={`brm-source ${project ? 'is-project' : ''}`}>
+          <select
+            value={project?.id ?? ''}
+            aria-label="Show comments from"
+            onChange={(e) => setSource((e.target as HTMLSelectElement).value)}
+          >
+            <option value="">This site</option>
+            {projects.projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}: customer feedback
+              </option>
+            ))}
+          </select>
+          {project && (
+            <button class="brm-btn brm-primary" disabled={projects.pulling} onClick={() => void projects.pull()} title={`Get new feedback from ${project.hubUrl}`}>
+              {projects.pulling ? 'Pulling…' : 'Pull feedback'}
+            </button>
+          )}
+        </div>
+      )}
+      {project && (
+        <p class={`brm-source-status ${project.lastError ? 'is-error' : ''}`}>
+          {project.lastError ??
+            projects.pullNote ??
+            (project.lastPull ? `Pulled ${time(project.lastPull)} from ${new URL(project.hubUrl).host}` : 'Not pulled yet.')}
+          {!project.lastError && (
+            <span class="brm-source-hint">
+              Customer feedback from {project.name}: your agent works on it as usual, the customer accepts or reopens it on staging.
+            </span>
+          )}
+        </p>
+      )}
+      {pending.length > 0 && host.projects && (
+        <div class="brm-pending">
+          <span>
+            <strong>{pending.length}</strong> {pending.length === 1 ? 'update is' : 'updates are'} not sent to the customer yet
+          </span>
+          <button class="brm-btn brm-primary" onClick={() => setSending(pending)}>
+            Send to customer…
+          </button>
+        </div>
+      )}
       <nav class="brm-filters">
         <label class="brm-filter">
           <span class="brm-dim">Show</span>
@@ -211,13 +341,16 @@ export function Sidebar({ comments, path, connected, focusId, docked, onClose, o
           <button
             class="brm-btn"
             onClick={() => expanded.setAll(anyOpen)}
-            title={anyOpen ? 'Collapse every thread for an overview' : 'Expand every thread'}
+            title={anyOpen ? 'Collapse every comment for an overview' : 'Expand every comment'}
           >
             {anyOpen ? 'Collapse all' : 'Expand all'}
           </button>
         )}
       </nav>
-      {!connected && (
+      {!connected && host.mode === 'review' && (
+        <p class="brm-warn">Can't reach the review server right now. Your feedback is sent when it is back; try again in a moment.</p>
+      )}
+      {!connected && host.mode !== 'review' && (
         <p class="brm-warn">
           No coding agent is connected. Your comments are saved here; your agent sees them as soon as a session with
           browser-review runs.{' '}
@@ -233,23 +366,35 @@ export function Sidebar({ comments, path, connected, focusId, docked, onClose, o
         </p>
       )}
       <div class="brm-side-list">
-        {shown.length === 0 && <p class="brm-empty">Nothing here.</p>}
+        {shown.length === 0 && <p class="brm-empty">{project ? 'No customer feedback with this status.' : 'Nothing here.'}</p>}
         {shown.map((c) => (
           <Card
             key={c.id}
             comment={c}
-            showPath={scope === 'site'}
-            onThisPage={c.path === path}
+            showPath={project !== null || scope === 'site'}
+            onThisPage={!project && c.path === path}
+            projectName={project?.name ?? null}
+            onSend={(c) => setSending([c])}
             open={expanded.isOpen(c.id)}
             focused={focusId === c.id}
             onToggle={() => expanded.toggle(c.id)}
             onHover={onHover}
             onGoTo={onGoTo}
             onOpenPage={onOpenPage}
-            onChanged={onChanged}
+            onChanged={afterChange}
           />
         ))}
       </div>
+      {sending && (
+        <SendPanel
+          comments={sending}
+          onClose={() => setSending(null)}
+          onDone={async () => {
+            setSending(null);
+            await afterChange();
+          }}
+        />
+      )}
     </aside>
   );
 }
@@ -258,6 +403,10 @@ interface CardProps {
   comment: Comment;
   showPath: boolean;
   onThisPage: boolean;
+  /** Shown from a review-hub project: customer feedback the developer can't accept or delete. */
+  projectName: string | null;
+  /** Open the Send to customer panel for this comment. */
+  onSend: (c: Comment) => void;
   open: boolean;
   /** Asked for (a pin, "Open thread"): scroll it into view. */
   focused: boolean;
@@ -268,8 +417,21 @@ interface CardProps {
   onChanged: () => Promise<void>;
 }
 
-function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHover, onGoTo, onOpenPage, onChanged }: CardProps) {
-  const { comments: api } = useHost();
+/** Who wrote a message, as the reader sees it. */
+function authorLabel(m: Message, mode: 'developer' | 'review', me: string | null): string {
+  if (m.author === 'user') return m.name && m.name !== me ? m.name : 'You';
+  return mode === 'review' ? (m.name ?? 'Developer') : 'Agent';
+}
+
+function Card({ comment: c, showPath, onThisPage, projectName, onSend, open, focused, onToggle, onHover, onGoTo, onOpenPage, onChanged }: CardProps) {
+  const host = useHost();
+  const { comments: api } = host;
+  const mode = host.mode ?? 'developer';
+  const me = host.me ?? null;
+  /** In review mode, customers can only delete or undo what they wrote themselves (the hub checks it too). */
+  const mine = mode !== 'review' || (c.messages[0]?.author === 'user' && c.messages[0].name === me);
+  /** A copy of customer feedback in the developer's extension: the customer accepts, reopens and deletes. */
+  const customer = mode !== 'review' && Boolean(c.project);
   const [reply, setReply] = useState(() => replyDraft.get(c.id));
 
   useEffect(() => replyDraft.set(c.id, reply), [c.id, reply]);
@@ -298,12 +460,12 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
     }
   }
 
-  const canUndo = c.kind !== 'comment' && canDelete(c);
+  const canUndo = c.kind !== 'comment' && canDelete(c) && mine && !customer;
 
   return (
     <article
       ref={ref}
-      class={`brm-thread ${open ? 'is-open' : ''}`}
+      class={`brm-thread st-${c.status} ${open ? 'is-open' : ''}`}
       onMouseEnter={() => onHover(c.id)}
       onMouseLeave={() => onHover(null)}
     >
@@ -311,6 +473,16 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
         <span class="brm-id">#{c.id}</span>
         <span class={`brm-badge st-${c.status}`}>{STATUS_LABELS[c.status]}</span>
         {c.kind !== 'comment' && <span class="brm-badge brm-kind">{KIND_LABELS[c.kind]}</span>}
+        {customer && c.outbox?.length ? (
+          <span class="brm-badge brm-unsent" title="Your agent's updates wait for you to send them">
+            Not sent
+          </span>
+        ) : null}
+        {customer && first?.name && (
+          <span class="brm-badge brm-who" title={`Customer feedback${projectName ? ` from ${projectName}` : ''}`}>
+            {first.name}
+          </span>
+        )}
         <span class="brm-dim brm-when">{time(c.updatedAt)}</span>
       </button>
       <div class="brm-thread-summary" onClick={onToggle}>
@@ -319,6 +491,11 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
           {showPath && <span class="brm-dim"> on {c.path}</span>}
         </div>
         {!open && first && <div class="brm-clamp">{first.body}</div>}
+        {customer && c.remote && (
+          <div class="brm-customer-sees">
+            Customer sees: <span class={`brm-badge st-${c.remote.status}`}>{STATUS_LABELS[c.remote.status]}</span>
+          </div>
+        )}
       </div>
 
       {open && (
@@ -339,7 +516,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
               <li key={m.id} class={`brm-msg by-${m.author}`}>
                 {m.author !== 'system' && (
                   <div class="brm-msg-meta">
-                    {m.author === 'user' ? 'You' : 'Agent'} <span class="brm-dim">{time(m.createdAt)}</span>
+                    {authorLabel(m, mode, me)} <span class="brm-dim">{time(m.createdAt)}</span>
                   </div>
                 )}
                 <div class="brm-msg-body">{m.body}</div>
@@ -349,7 +526,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
 
           {c.solution && (
             <div class="brm-solution">
-              <div class="brm-solution-title">How the agent solved it</div>
+              <div class="brm-solution-title">{mode === 'review' ? 'What was changed' : 'How the agent solved it'}</div>
               <div class="brm-msg-body">{c.solution.note}</div>
               {c.solution.files.length > 0 && (
                 <ul class="brm-files">
@@ -367,9 +544,11 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
             class="brm-reply"
             rows={2}
             placeholder={
-              c.status === 'review_ready'
-                ? `Not right? Say what is still wrong; ${sendKeyName(sendKey)} reopens.`
-                : `Reply; ${sendKeyName(sendKey)} sends`
+              customer
+                ? `Reply to the customer; ${sendKeyName(sendKey)} sends`
+                : c.status === 'review_ready'
+                  ? `Not right? Say what is still wrong; ${sendKeyName(sendKey)} reopens.`
+                  : `Reply; ${sendKeyName(sendKey)} sends`
             }
             value={reply}
             onInput={(e) => setReply((e.target as HTMLTextAreaElement).value)}
@@ -378,7 +557,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
               e.preventDefault();
               // Never accepts by keyboard: on a finished thread it reopens, with the text.
               if (busy || !reply.trim()) return;
-              if (c.status === 'review_ready' || c.status === 'accepted') void run(() => api.reopen(c.id, reply));
+              if (!customer && (c.status === 'review_ready' || c.status === 'accepted')) void run(() => api.reopen(c.id, reply));
               else void run(() => api.reply(c.id, reply));
             }}
           />
@@ -419,7 +598,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
                 Undo {c.kind === 'remove' ? 'removal' : 'edit'}
               </button>
             )}
-            {c.kind === 'comment' && canDelete(c) && (
+            {c.kind === 'comment' && canDelete(c) && mine && !customer && (
               <button
                 class="brm-btn"
                 disabled={busy}
@@ -431,12 +610,17 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
               </button>
             )}
             <span class="brm-spacer" />
-            {(c.status === 'review_ready' || c.status === 'accepted') && (
+            {customer && c.outbox?.length ? (
+              <button class="brm-btn brm-primary" onClick={() => onSend(c)} title="Choose what the customer sees: fixed, or more feedback needed">
+                Send to customer…
+              </button>
+            ) : null}
+            {!customer && (c.status === 'review_ready' || c.status === 'accepted') && (
               <button class="brm-btn" disabled={busy} onClick={() => void run(() => api.reopen(c.id, reply))}>
                 Reopen
               </button>
             )}
-            {c.status !== 'review_ready' && c.status !== 'accepted' && (
+            {(customer || (c.status !== 'review_ready' && c.status !== 'accepted')) && (
               <button
                 class="brm-btn"
                 disabled={busy || !reply.trim()}
@@ -445,7 +629,7 @@ function Card({ comment: c, showPath, onThisPage, open, focused, onToggle, onHov
                 Send
               </button>
             )}
-            {c.status === 'review_ready' && (
+            {!customer && c.status === 'review_ready' && (
               <button class="brm-btn brm-primary" disabled={busy} onClick={() => void run(() => api.accept(c.id))}>
                 Accept solution
               </button>
@@ -490,5 +674,130 @@ function Thumb({ comment }: { comment: Comment }) {
     >
       <img src={src} alt="Screenshot of the element" />
     </a>
+  );
+}
+
+
+/**
+ * Send to customer: for each comment, fixed (review ready, with a note) or more
+ * feedback needed (a question), in the developer's own words. Only what is sent
+ * here reaches the customer; the agent's queued updates are the suggestion.
+ */
+function SendPanel({ comments, onClose, onDone }: { comments: Comment[]; onClose: () => void; onDone: () => Promise<void> }) {
+  const host = useHost();
+  const [rows, setRows] = useState(() => comments.map((c) => ({ c, d: suggestDecision(c), include: true })));
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<Record<number, string>>({});
+  const update = (id: number, change: Partial<SendDecision> & { include?: boolean }) =>
+    setRows((rs) =>
+      rs.map((r) => (r.c.id === id ? { ...r, include: change.include ?? r.include, d: { ...r.d, ...change, id } } : r)),
+    );
+  const chosen = rows.filter((r) => r.include);
+  const missing = chosen.filter((r) => !r.d.message.trim());
+
+  const send = async () => {
+    if (!host.projects || chosen.length === 0) return;
+    setBusy(true);
+    try {
+      const results = await host.projects.send(chosen.map((r) => ({ id: r.c.id, decision: r.d.decision, message: r.d.message })));
+      const failed: Record<number, string> = {};
+      for (const res of results) if (!res.ok) failed[res.id] = res.error ?? 'Not sent.';
+      setErrors(failed);
+      const left = rows.filter((r) => failed[r.c.id] !== undefined || !r.include);
+      if (Object.keys(failed).length === 0) await onDone();
+      else setRows(left);
+    } catch (err) {
+      setErrors({ 0: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const discard = async (id: number) => {
+    await host.projects?.discard(id);
+    const left = rows.filter((r) => r.c.id !== id);
+    if (left.length === 0) await onDone();
+    else setRows(left);
+  };
+
+  return (
+    <div class="brm-send" role="dialog" aria-label="Send to customer">
+      <header class="brm-send-head">
+        <strong>Send to customer</strong>
+        <span class="brm-spacer" />
+        <button class="brm-icon-btn" title="Close" onClick={onClose}>
+          ✕
+        </button>
+      </header>
+      <p class="brm-send-intro">
+        Deployed to staging? Tell the customer what was fixed, or ask what you need. Only what you send here reaches them.
+      </p>
+      <div class="brm-send-list">
+        {rows.map(({ c, d, include }) => {
+          const first = c.messages.find((m) => m.author === 'user');
+          return (
+            <section key={c.id} class={`brm-send-row ${include ? '' : 'is-skipped'}`}>
+              <label class="brm-send-title">
+                <input type="checkbox" checked={include} onChange={(e) => update(c.id, { include: (e.target as HTMLInputElement).checked })} />
+                <span class="brm-id">#{c.id}</span>
+                {first?.name && <span class="brm-badge brm-who">{first.name}</span>}
+                <span class="brm-clamp brm-send-quote">{first?.body ?? ''}</span>
+              </label>
+              {include && (
+                <>
+                  <div class="brm-seg brm-send-choice" role="radiogroup">
+                    <button
+                      role="radio"
+                      aria-checked={d.decision === 'fixed'}
+                      class={d.decision === 'fixed' ? 'is-active is-fixed' : ''}
+                      onClick={() => update(c.id, { decision: 'fixed' })}
+                    >
+                      ✓ Fixed
+                    </button>
+                    <button
+                      role="radio"
+                      aria-checked={d.decision === 'question'}
+                      class={d.decision === 'question' ? 'is-active is-question' : ''}
+                      onClick={() => update(c.id, { decision: 'question' })}
+                    >
+                      ? More feedback needed
+                    </button>
+                  </div>
+                  <textarea
+                    class="brm-reply"
+                    rows={3}
+                    value={d.message}
+                    placeholder={d.decision === 'fixed' ? 'What did you change? The customer reads this.' : 'What do you need to know from the customer?'}
+                    onInput={(e) => update(c.id, { message: (e.target as HTMLTextAreaElement).value })}
+                  />
+                  <div class="brm-send-meta">
+                    <span class="brm-dim">
+                      Customer sees{' '}
+                      <span class={`brm-badge st-${c.remote?.status ?? c.status}`}>{STATUS_LABELS[c.remote?.status ?? c.status]}</span> →{' '}
+                      <span class={`brm-badge st-${d.decision === 'fixed' ? 'review_ready' : 'in_progress'}`}>
+                        {d.decision === 'fixed' ? 'Review ready' : 'In progress'}
+                      </span>
+                    </span>
+                    <button class="brm-link" onClick={() => void discard(c.id)} title="Drop the agent's updates; the customer keeps seeing what they see now">
+                      Discard agent updates
+                    </button>
+                  </div>
+                </>
+              )}
+              {errors[c.id] && <p class="brm-error">{errors[c.id]}</p>}
+            </section>
+          );
+        })}
+        {errors[0] && <p class="brm-error">{errors[0]}</p>}
+      </div>
+      <footer class="brm-send-foot">
+        <button class="brm-btn" onClick={onClose} disabled={busy}>
+          Later
+        </button>
+        <button class="brm-btn brm-primary" disabled={busy || chosen.length === 0 || missing.length > 0} onClick={() => void send()} title={missing.length ? 'Write a message for each comment you send' : undefined}>
+          {busy ? 'Sending…' : `Send ${chosen.length} to customer`}
+        </button>
+      </footer>
+    </div>
   );
 }

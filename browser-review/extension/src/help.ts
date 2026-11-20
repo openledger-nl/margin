@@ -1,6 +1,8 @@
-// The help page (help.html): setup command, live connection status, shortcuts.
-import { MCP_ADD_COMMAND, MCP_ADD_COMMAND_CODEX, MCP_JSON_CONFIG } from '@brm/shared';
-import type { ContentRequest, StatusResponse } from './messages.ts';
+// The help page (help.html): setup command, live connection status, shortcuts, review-hub projects.
+import { MCP_ADD_COMMAND, MCP_ADD_COMMAND_CODEX, MCP_JSON_CONFIG, type ProjectSummary } from '@brm/shared';
+import type { ContentRequest, StatusResponse, StoreOps, StoreResponse } from './messages.ts';
+import { normalizeHubUrl } from './hub-client.ts';
+import { PROJECTS_KEY } from './sync.ts';
 import { HOLD_KEY, HOLD_KEYS, SEND_KEY, SEND_KEYS, toHoldKey, toSendKey } from './settings.ts';
 import { SITE_ACCESS, SITE_ACCESS_KEY, SITES_KEY, toSiteAccess, toSites } from './sites.ts';
 
@@ -53,7 +55,7 @@ const LABELS: Record<string, string> = {
   'toggle-overlay': 'Show the overlay with the sidebar, or hide it',
   'pick-element': 'Pick an element',
   'page-comment': 'Comment on the whole page',
-  'toggle-threads': 'Open or close the threads sidebar',
+  'toggle-threads': 'Open or close the comments sidebar',
 };
 
 void chrome.commands.getAll().then((commands) => {
@@ -153,3 +155,102 @@ $('grant').addEventListener('click', () => {
   void chrome.permissions.request(ACCESS).then(() => checkAccess());
 });
 void checkAccess();
+
+// ---------- customer feedback: review-hub projects ----------
+
+async function storeOp<K extends keyof StoreOps>(op: K, args: StoreOps[K]['args']): Promise<StoreOps[K]['result']> {
+  const res = (await chrome.runtime.sendMessage({ type: 'store', op, args } satisfies ContentRequest)) as StoreResponse<StoreOps[K]['result']>;
+  if (!res.ok) throw new Error(res.error);
+  return res.data;
+}
+
+function when(iso: string): string {
+  return new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function showProjectError(message: string | null): void {
+  const box = $('project-error');
+  box.hidden = message === null;
+  box.textContent = message ?? '';
+}
+
+async function showProjects(): Promise<void> {
+  let projects: ProjectSummary[] = [];
+  try {
+    projects = await storeOp('projects', {});
+  } catch {
+    return;
+  }
+  const list = $('project-list');
+  list.replaceChildren();
+  $('no-projects').hidden = projects.length > 0;
+  if (projects[0]) $('project-json').textContent = `{ "project": "${projects[0].name}" }`;
+  for (const p of projects) {
+    const li = document.createElement('li');
+    const name = document.createElement('span');
+    name.className = 'project-name';
+    name.textContent = p.name;
+    const site = document.createElement('code');
+    site.textContent = p.origin;
+    const actions = document.createElement('span');
+    actions.className = 'actions';
+    const pull = document.createElement('button');
+    pull.className = 'link-btn';
+    pull.textContent = 'Pull now';
+    pull.addEventListener('click', () => {
+      pull.textContent = 'Pulling…';
+      void storeOp('pull', { id: p.id }).finally(() => void showProjects());
+    });
+    const remove = document.createElement('button');
+    remove.className = 'link-btn';
+    remove.textContent = 'Remove';
+    remove.addEventListener('click', () => {
+      if (!confirm(`Remove ${p.name}? Its feedback copies in this browser go too; the hub keeps everything.`)) return;
+      void storeOp('removeProject', { id: p.id }).finally(() => void showProjects());
+    });
+    actions.append(pull, remove);
+    const meta = document.createElement('span');
+    meta.className = `project-meta ${p.lastError ? 'is-error' : ''}`;
+    meta.textContent = p.lastError
+      ? `Last pull failed: ${p.lastError}`
+      : `${p.lastPull ? `Pulled ${when(p.lastPull)}` : 'Not pulled yet'} from ${p.hubUrl}, as ${p.you}.`;
+    li.append(name, site, actions, meta);
+    list.append(li);
+  }
+}
+void showProjects();
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && PROJECTS_KEY in changes) void showProjects();
+});
+
+$('project-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const hubInput = $('project-hub') as HTMLInputElement;
+  const tokenInput = $('project-token') as HTMLInputElement;
+  const button = $('project-add') as HTMLButtonElement;
+  showProjectError(null);
+  let hubUrl: string;
+  try {
+    hubUrl = normalizeHubUrl(hubInput.value);
+  } catch {
+    showProjectError('That is not a URL. It looks like https://staging.acme.com/__margin/.');
+    return;
+  }
+  // Firefox asks for site access to the hub; it has to be asked right in the click.
+  const access = chrome.permissions.request({ origins: [`${new URL(hubUrl).origin}/*`] }).catch(() => false);
+  button.disabled = true;
+  void (async () => {
+    try {
+      if (!(await access)) throw new Error('The extension needs access to the hub to pull from it. Try again and allow it.');
+      const p = await storeOp('addProject', { hubUrl, token: tokenInput.value });
+      hubInput.value = '';
+      tokenInput.value = '';
+      $('project-json').textContent = `{ "project": "${p.name}" }`;
+    } catch (err) {
+      showProjectError(err instanceof Error ? err.message : String(err));
+    } finally {
+      button.disabled = false;
+      void showProjects();
+    }
+  })();
+});

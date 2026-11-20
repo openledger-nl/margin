@@ -12,6 +12,8 @@ import { Composer } from './ui/Composer.tsx';
 import { Picker } from './ui/Picker.tsx';
 import { Outline, Pins } from './ui/Pins.tsx';
 import { Sidebar } from './ui/Sidebar.tsx';
+import { Mark } from './ui/Mark.tsx';
+import { Welcome } from './ui/Welcome.tsx';
 import { Toolbar } from './ui/Toolbar.tsx';
 
 type Mode =
@@ -24,9 +26,28 @@ const hiddenKey = (origin: string) => `hidden:${origin}`;
 /** sessionStorage key: comment to jump to after "Go to" navigated to its page. */
 const GOTO_KEY = 'brm-goto';
 const sidebarKey = (origin: string) => `sidebar:${origin}`;
+/** The customer saw the welcome (margin.js). */
+const WELCOME_KEY = 'welcomeSeen';
+/** ?margin_comment=12 in a link from the overview: open that comment. */
+const COMMENT_PARAM = 'margin_comment';
+
+/** Takes ?margin_comment= out of the address bar and hands it to the Go to logic. Once per page load. */
+function takeCommentParam(): void {
+  try {
+    const url = new URL(location.href);
+    const id = url.searchParams.get(COMMENT_PARAM);
+    if (!id || !/^\d+$/.test(id)) return;
+    url.searchParams.delete(COMMENT_PARAM);
+    history.replaceState(history.state, '', url);
+    sessionStorage.setItem(GOTO_KEY, id);
+  } catch {
+    // no sessionStorage: the link just opens the page
+  }
+}
 
 export function App({ previews }: { previews: Previews }) {
   const host = useHost();
+  useState(takeCommentParam);
   const href = useHref();
   const { origin, path } = pageKey(href);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -38,11 +59,27 @@ export function App({ previews }: { previews: Previews }) {
   const [focusId, setFocusId] = useState<number | null>(null);
   const [hoverId, setHoverId] = useState<number | null>(null);
   const [flashId, setFlashId] = useState<number | null>(null);
-  /** The browser's side panel shows the threads; null until known. */
+  /** The browser's side panel shows the comments; null until known. */
   const [panel, setPanel] = useState<PanelState | null>(null);
   const usePanel = panel?.supported === true;
   /** Shown above the toolbar when the browser would not open the panel from a click in the page. */
   const [hint, setHint] = useState<string | null>(null);
+  const review = host.mode === 'review';
+  const [showWelcome, setShowWelcome] = useState(false);
+  // Customers get the welcome once, in this browser.
+  useEffect(() => {
+    if (!review) return;
+    void host.settings
+      .get(WELCOME_KEY)
+      .then((seen) => seen !== true && setShowWelcome(true))
+      .catch(() => {});
+  }, [host, review]);
+
+  // Every page opened with the toolbar on, for the overview's site map (after the title settles).
+  useEffect(() => {
+    const t = setTimeout(() => host.recordVisit?.(location.href, document.title), 800);
+    return () => clearTimeout(t);
+  }, [host, href]);
 
   // ---------- data ----------
 
@@ -226,7 +263,7 @@ export function App({ previews }: { previews: Previews }) {
   // ---------- actions ----------
 
   const showHint = () => {
-    setHint('Your browser only opens the side panel from the extension icon or Alt+Shift+T. Use one of those.');
+    setHint('Your browser only opens the side panel from the extension icon or Alt+C. Use one of those.');
     setTimeout(() => setHint(null), 6000);
   };
 
@@ -261,7 +298,8 @@ export function App({ previews }: { previews: Previews }) {
    */
   const goTo = useCallback(
     (c: Comment): string | null => {
-      if (c.path !== path) {
+      // Another page, or another site (customer feedback from staging): go there.
+      if (c.origin !== origin || c.path !== path) {
         sessionStorage.setItem(GOTO_KEY, String(c.id));
         location.href = c.url;
         return null;
@@ -281,7 +319,7 @@ export function App({ previews }: { previews: Previews }) {
       setTimeout(() => setFlashId((f) => (f === c.id ? null : f)), 1600);
       return null;
     },
-    [path],
+    [origin, path],
   );
   const goToRef = useRef(goTo);
   goToRef.current = goTo;
@@ -346,7 +384,16 @@ export function App({ previews }: { previews: Previews }) {
     if (open) openThread(c.id);
   };
 
-  if (hidden) return null;
+  if (hidden) {
+    // On a staging site there is no extension icon to bring it back.
+    if (host.mode !== 'review') return null;
+    return (
+      <button class="brm-ui brm-launcher" onClick={() => setHiddenStored(false)} title="Show the feedback toolbar (Alt+Shift+R)">
+        <Mark />
+        Feedback
+      </button>
+    );
+  }
 
   const pinned = pageComments.filter((c) => c.target && c.status !== 'accepted' && !isPreviewActiveRemove(c));
   const outlined = pageComments.find((c) => c.id === (flashId ?? hoverId));
@@ -360,6 +407,7 @@ export function App({ previews }: { previews: Previews }) {
         <Sidebar
           comments={comments}
           path={path}
+          origin={origin}
           connected={connected}
           focusId={focusId}
           onClose={() => setSidebarStored(false)}
@@ -409,8 +457,16 @@ export function App({ previews }: { previews: Previews }) {
         onPageComment={() => setMode({ type: 'compose', el: null, kind: 'comment' })}
         onToggleSidebar={toggleThreads}
         onHide={() => setHiddenStored(true)}
-        onHelp={() => host.openHelp()}
+        onHelp={() => (review ? setShowWelcome(true) : host.openHelp())}
       />
+      {showWelcome && (
+        <Welcome
+          onStart={() => {
+            setShowWelcome(false);
+            host.settings.set(WELCOME_KEY, true);
+          }}
+        />
+      )}
     </>
   );
 }

@@ -2,6 +2,8 @@
 import type { Rect, TargetInfo } from '@brm/shared';
 
 export const HOST_TAG = 'browser-review-overlay';
+/** Set on <html> by margin.js when this tab opened a review link: the extension then stays out. */
+export const REVIEW_ATTR = 'data-margin-review';
 
 /** True for our own overlay host, which must never be picked or matched. */
 export function isOurs(el: Element | null): boolean {

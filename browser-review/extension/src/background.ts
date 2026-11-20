@@ -43,8 +43,22 @@ import {
   type SiteSettings,
 } from './sites.ts';
 import { IdbDb } from './idb.ts';
-import { Store } from '@brm/shared';
+import { Store, mergeVisit, type PageVisit, type PullSummary, type SendDecision } from '@brm/shared';
 import { cropToPng } from './crop.ts';
+import {
+  PROJECTS_KEY,
+  VISITS_KEY,
+  projectVisitsKey,
+  checkProject,
+  hubErrorMessage,
+  pullProject,
+  pushToHub,
+  sendDecision,
+  summary,
+  toProjects,
+  type HubAction,
+  type Project,
+} from './sync.ts';
 
 const WS_URL = `ws://127.0.0.1:${DEFAULT_PORT}/ws`;
 const VERSION = chrome.runtime.getManifest().version;
@@ -128,7 +142,16 @@ async function handleCall(method: BridgeMethod, params: unknown): Promise<unknow
   switch (method) {
     case 'list': {
       const p = call('list');
-      return store.list({ origin: p.origin, statuses: p.statuses });
+      let project: string | null | undefined;
+      if (typeof p.project === 'string') project = (await projectByName(p.project)).id;
+      else if (p.project === null) project = null;
+      return store.list({ origin: p.origin, statuses: p.statuses, project });
+    }
+    case 'projects':
+      return (await readProjects()).map(summary);
+    case 'pull': {
+      const name = call('pull').project;
+      return pullProjects(name === undefined ? undefined : (await projectByName(name)).id);
     }
     case 'get':
       return store.mustGet(call('get').id);
@@ -145,16 +168,123 @@ async function handleCall(method: BridgeMethod, params: unknown): Promise<unknow
       if (shot.element) await store.addScreenshot(c.id, 'element', 'capture', shot.element);
       return { comment: c, ...shot } satisfies BridgeCalls['capture']['result'];
     }
-    case 'start_work':
-      return changed(await store.startWork(call('start_work').id));
+    // On customer feedback the agent's updates wait in the outbox until the developer sends them.
+    case 'start_work': {
+      const { id } = call('start_work');
+      return changed((await queued(id, { type: 'start_work' })) ?? (await store.startWork(id)));
+    }
     case 'reply': {
       const p = call('reply');
-      return changed(await store.addMessage(p.id, 'claude', p.message));
+      return changed((await queued(p.id, { type: 'reply', message: p.message })) ?? (await store.addMessage(p.id, 'claude', p.message)));
     }
     case 'submit_solution': {
       const p = call('submit_solution');
-      return changed(await store.submitSolution(p.id, p.note, p.files));
+      const action: HubAction = { type: 'submit_solution', note: p.note, files: p.files };
+      return changed((await queued(p.id, action)) ?? (await store.submitSolution(p.id, p.note, p.files)));
     }
+  }
+  // A newer MCP server than this extension knows.
+  throw new Error(`This version of the Margin extension (${VERSION}) does not know "${String(method)}". Update the extension.`);
+}
+
+// ---------- review-hub projects (sync.ts) ----------
+
+let projectsQueue: Promise<unknown> = Promise.resolve();
+
+async function readProjects(): Promise<Project[]> {
+  return toProjects((await chrome.storage.local.get(PROJECTS_KEY))[PROJECTS_KEY]);
+}
+
+/** Read, change and store the projects, one change at a time. */
+function updateProjects<T>(fn: (list: Project[]) => { list: Project[]; result: T }): Promise<T> {
+  const run = projectsQueue.then(async () => {
+    const { list, result } = fn(await readProjects());
+    await chrome.storage.local.set({ [PROJECTS_KEY]: list });
+    return result;
+  });
+  projectsQueue = run.catch(() => {});
+  return run.finally(() => broadcast({ type: 'projects-changed' }));
+}
+
+async function projectByName(name: string): Promise<Project> {
+  const list = await readProjects();
+  const p = list.find((x) => x.name === name) ?? list.find((x) => x.id === name);
+  if (!p) {
+    const known = list.map((x) => `"${x.name}"`).join(', ');
+    throw new Error(`No project "${name}" in the Margin extension. ${known ? `Known: ${known}.` : 'Add one on the help page (Projects).'}`);
+  }
+  return p;
+}
+
+/** Pulls in flight, per project, so two pulls of one project never overlap. */
+const pulling = new Map<string, Promise<PullSummary>>();
+
+/** Pulls one project or all. A failed project gets its error; the others still pull. */
+async function pullProjects(id?: string): Promise<PullSummary[]> {
+  const list = (await readProjects()).filter((p) => id === undefined || p.id === id);
+  return Promise.all(list.map((p) => pullOne(p)));
+}
+
+function pullOne(p: Project): Promise<PullSummary> {
+  const running = pulling.get(p.id);
+  if (running) return running;
+  const run = (async (): Promise<PullSummary> => {
+    try {
+      const { summary: s, now, origins, visits } = await pullProject(store, p);
+      if (visits) await chrome.storage.local.set({ [projectVisitsKey(p.id)]: visits });
+      await updateProjects((list) => ({ list: list.map((x) => (x.id === p.id ? { ...x, lastPull: now, lastError: null } : x)), result: null }));
+      for (const origin of origins) changed({ origin });
+      return s;
+    } catch (err) {
+      const error = hubErrorMessage(p, err);
+      await updateProjects((list) => ({ list: list.map((x) => (x.id === p.id ? { ...x, lastError: error } : x)), result: null }));
+      return { project: p.name, added: 0, updated: 0, removed: 0, error };
+    }
+  })().finally(() => pulling.delete(p.id));
+  pulling.set(p.id, run);
+  return run;
+}
+
+/** For a copy of a hub comment: queues the agent's update for the developer to send. Null for a local comment. */
+async function queued(id: number, action: HubAction): Promise<Comment | null> {
+  const c = await store.mustGet(id);
+  if (!c.project) return null;
+  return store.queueOutbox(id, action);
+}
+
+/** For a copy of a hub comment: does the action on the hub. Null for a local comment (do it here). */
+async function viaHub(id: number, action: HubAction): Promise<Comment | null> {
+  const c = await store.mustGet(id);
+  if (!c.project) return null;
+  const p = (await readProjects()).find((x) => x.id === c.project);
+  if (!p) throw new Error(`Comment #${id} came from a review-hub project that was removed.`);
+  return pushToHub(store, p, c, action);
+}
+
+/** Sends the developer's decisions one by one; a failed one keeps its outbox and says why. */
+async function sendAll(decisions: SendDecision[]): Promise<{ id: number; ok: boolean; error: string | null }[]> {
+  const projects = await readProjects();
+  const results: { id: number; ok: boolean; error: string | null }[] = [];
+  for (const d of decisions) {
+    try {
+      const c = await store.mustGet(d.id);
+      const p = projects.find((x) => x.id === c.project);
+      if (!p) throw new Error(`Comment #${d.id} is not customer feedback of a project you have.`);
+      changed(await sendDecision(store, p, c, d));
+      results.push({ id: d.id, ok: true, error: null });
+    } catch (err) {
+      results.push({ id: d.id, ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return results;
+}
+
+/** Customers accept, reopen and delete on the staging site; the hub decides. */
+async function refuseOnCopy(id: number, what: string): Promise<void> {
+  const c = await store.mustGet(id);
+  if (c.project) {
+    const p = (await readProjects()).find((x) => x.id === c.project);
+    throw new Error(`Comment #${id} is customer feedback from ${p?.name ?? 'a review hub'}: only the customer can ${what} it, on the staging site.`);
   }
 }
 
@@ -176,16 +306,40 @@ function broadcast(ev: PortEvent): void {
 
 // The service worker can be stopped by the browser. Alarms wake it up so it reconnects.
 chrome.alarms.create('keepalive', { periodInMinutes: 0.5 });
+/** New customer feedback every few minutes, without anyone pressing Pull. */
+const PULL_ALARM = 'pull-projects';
+chrome.alarms.create(PULL_ALARM, { periodInMinutes: 5 });
 // Only in `pnpm dev` builds (see dev-reload.ts).
 if (__DEV_RELOAD__) startDevReload(__DEV_RELOAD__, () => overlayTabs());
 
-chrome.alarms.onAlarm.addListener(() => connect());
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === PULL_ALARM) void pullProjects();
+  else connect();
+});
 chrome.runtime.onStartup.addListener(() => connect());
 chrome.runtime.onInstalled.addListener((details) => {
   connect();
   if (details.reason === 'install') openHelp();
 });
 connect();
+
+// ---------- page visits, for the overview's site map ----------
+
+let visitsQueue: Promise<unknown> = Promise.resolve();
+
+/** Only pages where the overlay runs; path and title only (pageKey drops the query). */
+function recordVisit(url: string, title: string): Promise<void> {
+  const run = visitsQueue.then(async () => {
+    await siteSettingsReady;
+    if (!isAllowed(url, siteSettings)) return;
+    const { origin, path } = pageKey(url);
+    const list = ((await chrome.storage.local.get(VISITS_KEY))[VISITS_KEY] as PageVisit[] | undefined) ?? [];
+    const next = mergeVisit(list, { origin, path, title: title.slice(0, 300), by: 'You', at: new Date().toISOString() });
+    await chrome.storage.local.set({ [VISITS_KEY]: next });
+  });
+  visitsQueue = run.catch(() => {});
+  return run;
+}
 
 // ---------- help page ----------
 
@@ -241,6 +395,15 @@ chrome.runtime.onMessage.addListener((req: ContentRequest, sender, sendResponse)
   }
   if (req.type === 'open-help') {
     openHelp(req.section);
+    return false;
+  }
+  if (req.type === 'visit') {
+    void recordVisit(req.url, req.title);
+    return false;
+  }
+  if (req.type === 'open-overview') {
+    const q = req.project ? `project=${encodeURIComponent(req.project)}` : req.origin ? `origin=${encodeURIComponent(req.origin)}` : '';
+    void chrome.tabs.create({ url: chrome.runtime.getURL(`overview.html${q ? `?${q}` : ''}`) });
     return false;
   }
   if (req.type === 'status') {
@@ -352,19 +515,58 @@ async function runStoreOp(op: keyof StoreOps, args: unknown): Promise<unknown> {
     }
     case 'reply': {
       const p = a('reply');
-      return changed(await store.addMessage(p.id, 'user', p.body));
+      // On customer feedback the developer's reply goes to the hub, with their token's name.
+      return changed((await viaHub(p.id, { type: 'reply', message: p.body })) ?? (await store.addMessage(p.id, 'user', p.body)));
     }
     case 'accept':
+      await refuseOnCopy(a('accept').id, 'accept');
       return changed(await store.accept(a('accept').id));
     case 'reopen': {
       const p = a('reopen');
+      await refuseOnCopy(p.id, 'reopen');
       return changed(await store.reopen(p.id, p.body));
     }
     case 'delete': {
+      await refuseOnCopy(a('delete').id, 'delete');
       const c = await store.mustGet(a('delete').id);
       await store.delete(c.id);
       changed(c);
       return null;
+    }
+    case 'projects':
+      return (await readProjects()).map(summary);
+    case 'addProject': {
+      const { hubUrl, token } = a('addProject');
+      const p = await checkProject(hubUrl, token);
+      await updateProjects((list) => {
+        if (list.some((x) => x.hubUrl === p.hubUrl)) throw new Error(`${p.name} (${p.hubUrl}) is already added. Remove it first to use another token.`);
+        return { list: [...list, p], result: null };
+      });
+      void pullOne(p);
+      return summary(p);
+    }
+    case 'removeProject': {
+      const { id } = a('removeProject');
+      const gone = (await readProjects()).find((x) => x.id === id);
+      await updateProjects((list) => ({ list: list.filter((x) => x.id !== id), result: null }));
+      await store.deleteProject(id);
+      await chrome.storage.local.remove(projectVisitsKey(id));
+      if (gone) changed({ origin: gone.origin });
+      return null;
+    }
+    case 'pull':
+      return pullProjects(a('pull').id);
+    case 'send':
+      return sendAll(a('send').decisions);
+    case 'visits': {
+      const { origin, project } = a('visits');
+      if (project) return ((await chrome.storage.local.get(projectVisitsKey(project)))[projectVisitsKey(project)] as PageVisit[] | undefined) ?? [];
+      const all = ((await chrome.storage.local.get(VISITS_KEY))[VISITS_KEY] as PageVisit[] | undefined) ?? [];
+      return origin ? all.filter((v) => v.origin === origin) : all;
+    }
+    case 'discard': {
+      const c = await store.discardOutbox(a('discard').id);
+      return changed(c);
     }
   }
 }

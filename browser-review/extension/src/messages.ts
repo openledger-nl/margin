@@ -1,5 +1,5 @@
 // Messages between the content script / extension pages and the background service worker.
-import type { Comment, CreateCommentInput, Rect, TargetInfo, Viewport } from '@brm/shared';
+import type { Comment, CreateCommentInput, PageVisit, ProjectSummary, PullSummary, Rect, SendDecision, TargetInfo, Viewport } from '@brm/shared';
 
 /** Store operations the overlay can ask the background for. */
 export interface StoreOps {
@@ -9,6 +9,26 @@ export interface StoreOps {
   accept: { args: { id: number }; result: Comment };
   reopen: { args: { id: number; body?: string }; result: Comment };
   delete: { args: { id: number }; result: null };
+  /** Review-hub projects, without their tokens. */
+  projects: { args: Record<string, never>; result: ProjectSummary[] };
+  /** Checks the hub URL and developer token with the hub, then stores the project. */
+  addProject: { args: { hubUrl: string; token: string }; result: ProjectSummary };
+  /** Removes the project and its copied comments. */
+  removeProject: { args: { id: string }; result: null };
+  /** Pulls one project, or all. */
+  pull: { args: { id?: string }; result: PullSummary[] };
+  /** Sends the developer's decisions on customer feedback to the hub. */
+  send: { args: { decisions: SendDecision[] }; result: SendResult[] };
+  /** Drops a comment's unsent agent updates. */
+  discard: { args: { id: number }; result: Comment };
+  /** Page visits: one site (origin), or one project's (pulled from its hub). */
+  visits: { args: { origin?: string; project?: string }; result: PageVisit[] };
+}
+
+export interface SendResult {
+  id: number;
+  ok: boolean;
+  error: string | null;
 }
 export type StoreOp = keyof StoreOps;
 
@@ -18,6 +38,10 @@ export type ContentRequest =
   | { type: 'capture'; rect: Rect | null; viewport: Viewport }
   | { type: 'screenshot-data'; id: number }
   | { type: 'open-help'; section?: string }
+  /** The overlay opened a page (load or SPA navigation): remember it for the overview's site map. */
+  | { type: 'visit'; url: string; title: string }
+  /** Open the overview page for a site or a project. */
+  | { type: 'open-overview'; origin?: string; project?: string }
   | { type: 'status' }
   /** Open the threads side panel of the sender's window, optionally on one thread. Answer: PanelResponse. */
   | { type: 'open-panel'; focus?: number }
@@ -66,7 +90,9 @@ export type ScreenshotDataResponse = { ok: true; dataUrl: string } | { ok: false
 export type PortEvent =
   /** connected: a Claude Code session is connected. */
   | { type: 'status'; connected: boolean }
-  | { type: 'comments-changed'; origin: string };
+  | { type: 'comments-changed'; origin: string }
+  /** A project was added, removed or pulled (lastPull, lastError). */
+  | { type: 'projects-changed' };
 
 /** Background -> content script (chrome.tabs.sendMessage). */
 export type TabRequest =

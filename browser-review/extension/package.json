@@ -12,6 +12,7 @@
     "dev": "node build.ts --watch",
     "dev:firefox": "node build.ts --watch --firefox",
     "build:firefox": "node build.ts --firefox",
+    "build:embed": "node build-embed.ts",
     "package": "node build.ts --zip && node build.ts --zip --firefox",
     "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "tsc -p . && tsc -p tsconfig.node.json"
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@types/chrome": "^0.3.7",
     "esbuild": "^0.28.2",
+    "html-to-image": "1.11.13",
     "linkedom": "^0.18.15"
   }
 }

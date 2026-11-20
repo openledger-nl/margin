@@ -3,19 +3,33 @@
   all: initial;
 }
 
+/*
+ * Margin colors (brand/README.md): green #2F9E6B on paper #F4F1EA, screen
+ * #0E1016, prompt #4CC38A, code lines #B4BACB. Each status has its own color,
+ * used for pins, badges, counts and the stripe on each comment.
+ */
 .brm-root {
   --brm-bg: #ffffff;
-  --brm-fg: #1c1d21;
-  --brm-dim: #6b6f78;
-  --brm-line: #e3e4e8;
-  --brm-soft: #f5f5f7;
-  --brm-accent: #5b4cdb;
-  --brm-accent-soft: #eeecfc;
+  --brm-fg: #0e1016;
+  --brm-dim: #646a76;
+  --brm-line: #e4e0d6;
+  --brm-soft: #f4f1ea;
+  --brm-accent: #2f9e6b;
+  --brm-accent-strong: #23805a;
+  --brm-accent-soft: #e2f3ea;
+  --brm-screen: #0e1016;
+  --brm-screen-2: #1b1d24;
+  --brm-prompt: #4cc38a;
+  --brm-code: #b4bacb;
   --brm-open: #2f6fdb;
-  --brm-progress: #a86512;
-  --brm-review: #5b4cdb;
-  --brm-accepted: #2b7a4b;
-  --brm-shadow: 0 8px 28px rgba(20, 20, 40, 0.18), 0 1px 3px rgba(20, 20, 40, 0.12);
+  --brm-open-soft: #e7effc;
+  --brm-progress: #c27a0e;
+  --brm-progress-soft: #fbf0dc;
+  --brm-review: #7048e8;
+  --brm-review-soft: #efe9fd;
+  --brm-accepted: #2f9e6b;
+  --brm-accepted-soft: #e2f3ea;
+  --brm-shadow: 0 8px 28px rgba(14, 16, 22, 0.2), 0 1px 3px rgba(14, 16, 22, 0.14);
   font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color: var(--brm-fg);
   -webkit-font-smoothing: antialiased;
@@ -114,7 +128,8 @@ code {
 }
 
 .brm-btn.brm-primary:hover:not(:disabled) {
-  background: #4a3cc4;
+  background: var(--brm-accent-strong);
+  border-color: var(--brm-accent-strong);
 }
 
 .brm-icon-btn {
@@ -179,12 +194,42 @@ code {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 6px 6px 14px;
+  padding: 6px 6px 6px 10px;
   font-size: 14px;
-  background: var(--brm-bg);
-  border: 1px solid var(--brm-line);
-  border-radius: 10px;
+  /* The Margin "screen": dark, so it stands out on any page. */
+  background: var(--brm-screen);
+  color: #fff;
+  border: 1px solid var(--brm-screen-2);
+  border-radius: 12px;
   box-shadow: var(--brm-shadow);
+}
+
+.brm-brand {
+  position: relative;
+  display: inline-flex;
+  margin-right: 6px;
+}
+
+.brm-mark {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.brm-side-head .brm-mark {
+  width: 22px;
+  height: 22px;
+}
+
+/* The connection dot sits on the mark's corner. */
+.brm-brand .brm-dot {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  border: 2px solid var(--brm-screen);
 }
 
 .brm-tool {
@@ -197,6 +242,7 @@ code {
   border-radius: 8px;
   font-weight: 500;
   background: transparent;
+  color: inherit;
 }
 
 .brm-tool svg {
@@ -206,12 +252,12 @@ code {
 }
 
 .brm-tool:hover {
-  background: var(--brm-soft);
+  background: rgba(255, 255, 255, 0.09);
 }
 
 .brm-tool.is-active {
-  background: var(--brm-accent-soft);
-  color: var(--brm-accent);
+  background: rgba(76, 195, 138, 0.18);
+  color: var(--brm-prompt);
 }
 
 .brm-count {
@@ -257,17 +303,23 @@ code {
 }
 
 .brm-dot.is-on {
-  background: var(--brm-accepted);
+  background: var(--brm-prompt);
 }
 
 .brm-dot.is-off {
-  background: #a0a3ab;
+  background: #e5484d;
 }
 
 .brm-toolbar .brm-icon-btn {
   width: 40px;
   height: 40px;
   font-size: 15px;
+  color: var(--brm-code);
+}
+
+.brm-toolbar .brm-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
 }
 
 .brm-toolbar .brm-count {
@@ -289,7 +341,7 @@ code {
 }
 
 .brm-highlight {
-  background: rgba(91, 76, 219, 0.14);
+  background: rgba(47, 158, 107, 0.14);
   outline: 2px solid var(--brm-accent);
 }
 
@@ -318,7 +370,7 @@ code {
   max-width: 520px;
   padding: 2px 8px;
   border-radius: 5px;
-  background: #1c1d21;
+  background: var(--brm-screen);
   color: #fff;
   font-size: 12px;
   white-space: nowrap;
@@ -337,7 +389,7 @@ code {
   transform: translateX(-50%);
   padding: 6px 12px;
   border-radius: 8px;
-  background: #1c1d21;
+  background: var(--brm-screen);
   color: #fff;
   font-size: 12px;
   pointer-events: none;
@@ -562,9 +614,10 @@ code {
 .brm-side-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 10px 10px 14px;
+  gap: 8px;
+  padding: 10px 10px 10px 12px;
   border-bottom: 1px solid var(--brm-line);
+  background: var(--brm-soft);
 }
 
 .brm-side-head strong {
@@ -575,7 +628,7 @@ code {
   display: flex;
   margin-left: auto;
   padding: 2px;
-  background: var(--brm-soft);
+  background: #e9e4d8;
   border-radius: 7px;
 }
 
@@ -591,7 +644,8 @@ code {
 
 .brm-seg button.is-active {
   background: var(--brm-bg);
-  color: var(--brm-fg);
+  color: var(--brm-accent-strong);
+  font-weight: 600;
   box-shadow: 0 1px 2px rgba(20, 20, 40, 0.12);
 }
 
@@ -635,18 +689,38 @@ code {
 }
 
 .brm-thread {
+  --brm-st: var(--brm-open);
+  --brm-st-soft: var(--brm-open-soft);
   border: 1px solid var(--brm-line);
+  border-left: 4px solid var(--brm-st);
   border-radius: 8px;
   margin-bottom: 8px;
   background: var(--brm-bg);
 }
 
+.brm-thread.st-in_progress {
+  --brm-st: var(--brm-progress);
+  --brm-st-soft: var(--brm-progress-soft);
+}
+
+.brm-thread.st-review_ready {
+  --brm-st: var(--brm-review);
+  --brm-st-soft: var(--brm-review-soft);
+}
+
+.brm-thread.st-accepted {
+  --brm-st: var(--brm-accepted);
+  --brm-st-soft: var(--brm-accepted-soft);
+}
+
 .brm-thread:hover {
-  border-color: #c9cad2;
+  border-color: #cfc9ba;
+  border-left-color: var(--brm-st);
 }
 
 .brm-thread.is-open {
-  border-color: var(--brm-accent);
+  border-color: var(--brm-st);
+  box-shadow: 0 0 0 3px var(--brm-st-soft);
 }
 
 .brm-thread-head {
@@ -677,6 +751,13 @@ code {
   color: var(--brm-fg);
   border: 1px solid var(--brm-line);
   line-height: 16px;
+}
+
+/* Who left customer feedback. */
+.brm-badge.brm-who {
+  background: var(--brm-accent-soft);
+  color: var(--brm-accent-strong);
+  font-weight: 600;
 }
 
 .brm-when {
@@ -762,10 +843,21 @@ code {
   overflow-wrap: anywhere;
 }
 
+.brm-msg.by-user .brm-msg-body {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--brm-soft);
+}
+
 .brm-msg.by-claude .brm-msg-body {
   padding: 6px 8px;
   border-radius: 6px;
+  border-left: 3px solid var(--brm-accent);
   background: var(--brm-accent-soft);
+}
+
+.brm-msg.by-claude .brm-msg-meta {
+  color: var(--brm-accent-strong);
 }
 
 .brm-msg.by-system .brm-msg-body {
@@ -778,7 +870,7 @@ code {
   padding: 8px 10px;
   border-left: 3px solid var(--brm-review);
   border-radius: 0 6px 6px 0;
-  background: var(--brm-accent-soft);
+  background: var(--brm-review-soft);
 }
 
 .brm-solution-title {
@@ -812,7 +904,7 @@ code {
   max-width: 340px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: #1c1d21;
+  background: var(--brm-screen);
   color: #fff;
   font-size: 13px;
   box-shadow: var(--brm-shadow);
@@ -820,7 +912,7 @@ code {
 
 /* The sidebar inside the browser's side panel (panel.html) fills it. */
 .brm-sidebar.is-docked {
-  position: static;
+  position: relative;
   width: auto;
   height: 100vh;
   border-left: 0;
@@ -849,4 +941,400 @@ code {
 
 .brm-panel-empty p {
   margin: 0 0 12px;
+}
+
+/* ---------- margin.js on a staging site: brings the hidden toolbar back ---------- */
+
+.brm-launcher {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px 0 8px;
+  border: 1px solid var(--brm-screen-2);
+  border-radius: 20px;
+  background: var(--brm-screen);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--brm-shadow);
+}
+
+.brm-launcher:hover {
+  background: var(--brm-screen-2);
+}
+
+.brm-launcher .brm-mark {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---------- where the comments come from: this site or a review-hub project ---------- */
+
+.brm-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--brm-line);
+}
+
+.brm-source select {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--brm-line);
+  border-radius: 6px;
+  background: var(--brm-bg);
+  color: var(--brm-fg);
+  font: inherit;
+  font-weight: 600;
+}
+
+.brm-source.is-project {
+  background: var(--brm-accent-soft);
+}
+
+.brm-source.is-project select {
+  border-color: var(--brm-accent);
+  color: var(--brm-accent-strong);
+}
+
+.brm-source-status {
+  margin: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--brm-line);
+  font-size: 12px;
+  color: var(--brm-dim);
+}
+
+.brm-source-status.is-error {
+  color: #b42318;
+  background: #fef3f2;
+}
+
+.brm-source-hint {
+  display: block;
+  margin-top: 2px;
+  color: var(--brm-accent-strong);
+}
+
+/* "Open page" is a link that looks like the other buttons. */
+a.brm-btn {
+  display: inline-flex;
+  align-items: center;
+  color: var(--brm-fg);
+  text-decoration: none;
+}
+
+/* ---------- margin.js: the customer's welcome, shown once ---------- */
+
+.brm-welcome-back {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(14, 16, 22, 0.45);
+}
+
+.brm-welcome {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 22px 24px 20px;
+  border-radius: 14px;
+  background: var(--brm-bg);
+  box-shadow: var(--brm-shadow);
+  font-size: 14px;
+}
+
+.brm-welcome-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brm-welcome-head .brm-mark {
+  width: 40px;
+  height: 40px;
+}
+
+.brm-welcome h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.brm-welcome-intro {
+  margin: 12px 0 14px;
+  font-size: 15px;
+}
+
+.brm-welcome-steps {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.brm-welcome-steps li {
+  position: relative;
+  margin-bottom: 10px;
+  padding: 10px 12px 10px 44px;
+  border-radius: 10px;
+  background: var(--brm-soft);
+  counter-increment: step;
+}
+
+.brm-welcome-steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brm-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+}
+
+.brm-keys {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.brm-keys kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--brm-line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--brm-bg);
+  font: 11px/18px ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.brm-welcome-note {
+  margin: 0 0 16px;
+  color: var(--brm-dim);
+  font-size: 13px;
+}
+
+.brm-welcome-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.brm-welcome-start {
+  height: 40px;
+  padding: 0 20px;
+  font-size: 15px;
+}
+
+/* ---------- dropdowns: one look everywhere in the overlay ---------- */
+
+.brm-root select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 32px;
+  padding: 0 32px 0 12px;
+  border: 1px solid var(--brm-line);
+  border-radius: 8px;
+  background: var(--brm-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2323805a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 11px center / 12px 12px;
+  color: var(--brm-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(14, 16, 22, 0.06);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.brm-root select:hover {
+  border-color: #cfc9ba;
+}
+
+.brm-root select:focus {
+  outline: none;
+  border-color: var(--brm-accent);
+  box-shadow: 0 0 0 3px var(--brm-accent-soft);
+}
+
+.brm-root select option {
+  font-weight: 500;
+  color: var(--brm-fg);
+  background: var(--brm-bg);
+}
+
+.brm-source.is-project select {
+  background-color: #fff;
+}
+
+/* ---------- Overview button, unsent updates ---------- */
+
+.brm-overview-btn {
+  color: var(--brm-accent-strong);
+  border-color: #bfe0cb;
+  background: var(--brm-accent-soft);
+  font-weight: 600;
+}
+
+.brm-overview-btn:hover {
+  background: #d3ecdf;
+}
+
+.brm-pending {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f1d9a6;
+  background: var(--brm-progress-soft);
+  color: #6b4508;
+  font-size: 12px;
+}
+
+.brm-badge.brm-unsent {
+  background: var(--brm-progress-soft);
+  color: #8a5a0b;
+  border: 1px dashed var(--brm-progress);
+  line-height: 16px;
+  font-weight: 600;
+}
+
+.brm-customer-sees {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--brm-dim);
+}
+
+.brm-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brm-dim);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.brm-link:hover {
+  color: #b42318;
+}
+
+/* ---------- Send to customer ---------- */
+
+.brm-sidebar .brm-send {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.brm-send {
+  display: flex;
+  flex-direction: column;
+  background: var(--brm-bg);
+}
+
+.brm-send-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 10px 14px;
+  border-bottom: 1px solid var(--brm-line);
+  background: var(--brm-soft);
+}
+
+.brm-send-head strong {
+  font-size: 14px;
+}
+
+.brm-send-intro {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--brm-dim);
+  font-size: 12px;
+  border-bottom: 1px solid var(--brm-line);
+}
+
+.brm-send-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.brm-send-row {
+  margin-bottom: 8px;
+  padding: 10px;
+  border: 1px solid var(--brm-line);
+  border-radius: 8px;
+}
+
+.brm-send-row.is-skipped {
+  opacity: 0.6;
+}
+
+.brm-send-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.brm-send-title input {
+  accent-color: var(--brm-accent);
+}
+
+.brm-send-quote {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--brm-dim);
+}
+
+.brm-send-choice {
+  display: flex;
+  margin: 0 0 8px;
+}
+
+.brm-send-choice button {
+  flex: 1;
+  height: 30px;
+  font-weight: 600;
+}
+
+.brm-send-choice button.is-fixed {
+  color: var(--brm-review);
+}
+
+.brm-send-choice button.is-question {
+  color: var(--brm-progress);
+}
+
+.brm-send-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.brm-send-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--brm-line);
 }

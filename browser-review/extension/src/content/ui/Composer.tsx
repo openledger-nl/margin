@@ -32,7 +32,10 @@ const OPEN_THREAD_KEY = 'openThreadAfterSend';
 
 export function Composer({ el, initialKind, draft, notice, previews, onCreated, onCancel }: Props) {
   const host = useHost();
-  const [kind, setKind] = useState<Kind>(el ? (draft?.kind ?? initialKind) : 'comment');
+  const [kind, setKind] = useState<Kind>(() => {
+    const k = el ? (draft?.kind ?? initialKind) : 'comment';
+    return host.mode === 'review' && k === 'edit' ? 'comment' : k;
+  });
   const [body, setBody] = useState(draft?.body ?? '');
   const textNodes = useMemo(() => (el ? textNodesOf(el) : []), [el]);
   const originals = useMemo(() => textNodes.map((n) => n.nodeValue ?? ''), [textNodes]);
@@ -221,7 +224,8 @@ export function Composer({ el, initialKind, draft, notice, previews, onCreated, 
         </div>
         {el && (
           <div class="brm-tabs" role="tablist">
-            {(['comment', 'remove', 'edit'] as const).map((k) => (
+            {/* Customers on staging comment or remove; editing text and CSS is for developers. */}
+            {(host.mode === 'review' ? (['comment', 'remove'] as const) : (['comment', 'remove', 'edit'] as const)).map((k) => (
               <button
                 key={k}
                 role="tab"
@@ -241,7 +245,10 @@ export function Composer({ el, initialKind, draft, notice, previews, onCreated, 
         {notice && <p class="brm-note">{notice}</p>}
 
         {kind === 'remove' && (
-          <p class="brm-help">The element is hidden now. Your agent removes it in the code. You can undo this in the sidebar.</p>
+          <p class="brm-help">
+            The element is hidden now. {host.mode === 'review' ? 'The developer' : 'Your agent'} removes it in the code. You
+            can undo this in the sidebar.
+          </p>
         )}
 
         {kind === 'edit' && (
@@ -289,9 +296,9 @@ export function Composer({ el, initialKind, draft, notice, previews, onCreated, 
         {error && <p class="brm-error">{error}</p>}
 
         <div class="brm-actions">
-          <label class="brm-check" title="Show the new thread in the sidebar after sending">
+          <label class="brm-check" title="Show the new comment in the sidebar after sending">
             <input type="checkbox" checked={openThread} onChange={(e) => toggleOpenThread((e.target as HTMLInputElement).checked)} />
-            Open thread
+            Show in sidebar
           </label>
           <button class="brm-btn" onClick={onCancel} disabled={saving}>
             Cancel

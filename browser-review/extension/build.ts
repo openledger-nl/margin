@@ -31,7 +31,7 @@ for (const size of [16, 32, 48, 128]) copyFileSync(join(root, '..', '..', 'brand
 
 /** The files in static/ that are copied as they are (the manifest per browser). */
 function copyStatic(): void {
-  for (const file of ['notice.html', 'help.html', 'panel.html']) copyFileSync(join(root, 'static', file), join(dist, file));
+  for (const file of ['notice.html', 'help.html', 'panel.html', 'overview.html']) copyFileSync(join(root, 'static', file), join(dist, file));
   copyFileSync(join(root, '..', 'LICENSE'), join(dist, 'LICENSE'));
   const manifest = JSON.parse(readFileSync(join(root, 'static', 'manifest.json'), 'utf8')) as Record<string, unknown>;
   writeFileSync(join(dist, 'manifest.json'), `${JSON.stringify(firefox ? firefoxManifest(manifest) : manifest, null, 2)}\n`);
@@ -45,6 +45,7 @@ const options: esbuild.BuildOptions = {
     notice: join(root, 'src', 'notice.ts'),
     help: join(root, 'src', 'help.ts'),
     panel: join(root, 'src', 'panel.tsx'),
+    overview: join(root, 'src', 'overview', 'ext-entry.tsx'),
   },
   outdir: dist,
   bundle: true,

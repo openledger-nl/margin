@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": { "types": ["node", "chrome"], "lib": ["es2024", "dom", "dom.iterable"] },
-  "include": ["build.ts", "src/**/*.test.ts"]
+  "include": ["build.ts", "build-embed.ts", "src/**/*.test.ts"]
 }

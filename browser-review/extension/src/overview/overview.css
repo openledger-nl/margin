@@ -1,0 +1,481 @@
+/* The feedback overview, in the Margin colors (brand/README.md). Also its print (PDF) layout. */
+:root {
+  --bg: #ffffff;
+  --fg: #0e1016;
+  --dim: #646a76;
+  --line: #e4e0d6;
+  --paper: #f4f1ea;
+  --accent: #2f9e6b;
+  --accent-strong: #23805a;
+  --accent-soft: #e2f3ea;
+  --screen: #0e1016;
+  --open: #2f6fdb;
+  --open-soft: #e7effc;
+  --in_progress: #c27a0e;
+  --in_progress-soft: #fbf0dc;
+  --review_ready: #7048e8;
+  --review_ready-soft: #efe9fd;
+  --accepted: #2f9e6b;
+  --accepted-soft: #e2f3ea;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--fg);
+  font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+button,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+.ov {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.ov-dim {
+  color: var(--dim);
+}
+
+.ov-error {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #fef3f2;
+  color: #b42318;
+}
+
+.ov-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.ov-head .brm-mark {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+.ov-title {
+  flex: 1;
+  min-width: 220px;
+}
+
+.ov-title h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.ov-title p {
+  margin: 2px 0 0;
+}
+
+.ov-tools {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ov-tools select,
+.ov-filters select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 36px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2323805a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center / 12px 12px;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(14, 16, 22, 0.06);
+}
+
+.ov-tools select:hover,
+.ov-filters select:hover {
+  border-color: #cfc9ba;
+}
+
+.ov-tools select:focus,
+.ov-filters select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.ov-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ov-btn:hover {
+  border-color: #cfc9ba;
+}
+
+.ov-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.ov-primary:hover {
+  background: var(--accent-strong);
+}
+
+.ov-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 20px 0 12px;
+}
+
+.ov-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
+.ov-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--st, var(--dim));
+}
+
+.st-open {
+  --st: var(--open);
+  --st-soft: var(--open-soft);
+}
+.st-in_progress {
+  --st: var(--in_progress);
+  --st-soft: var(--in_progress-soft);
+}
+.st-review_ready {
+  --st: var(--review_ready);
+  --st-soft: var(--review_ready-soft);
+}
+.st-accepted {
+  --st: var(--accepted);
+  --st-soft: var(--accepted-soft);
+}
+
+.ov-filters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.ov-filters label {
+  font-weight: 600;
+}
+
+.ov-legend {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+.ov-map {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ov-page {
+  border-top: 1px solid var(--line);
+}
+
+.ov-page:first-child {
+  border-top: 0;
+}
+
+.ov-row {
+  display: grid;
+  grid-template-columns: 16px max-content minmax(0, 1fr) auto minmax(120px, auto);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px 10px calc(14px + var(--ov-depth, 0) * 22px);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ov-row:disabled {
+  cursor: default;
+}
+
+.ov-row:hover:not(:disabled) {
+  background: var(--paper);
+}
+
+.ov-page.is-open > .ov-row {
+  background: var(--accent-soft);
+}
+
+.ov-page.is-unvisited .ov-path,
+.ov-page.is-unvisited .ov-page-title {
+  color: var(--dim);
+}
+
+.ov-caret {
+  color: var(--dim);
+}
+
+.ov-path {
+  font: 13px ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-weight: 600;
+}
+
+.ov-page-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ov-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--st);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 22px;
+  text-align: center;
+}
+
+.ov-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px dashed #cfc9ba;
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.ov-visitors {
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ov-comments {
+  padding: 4px 14px 12px calc(40px + var(--ov-depth, 0) * 22px);
+  background: var(--accent-soft);
+}
+
+.ov-card {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--st);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.ov-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ov-id {
+  font-weight: 700;
+}
+
+.ov-badge {
+  padding: 0 8px;
+  border-radius: 9px;
+  background: var(--st);
+  color: #fff;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.ov-kind {
+  background: var(--paper);
+  color: var(--fg);
+  border: 1px solid var(--line);
+}
+
+.ov-who {
+  font-weight: 600;
+  color: var(--accent-strong);
+  white-space: nowrap;
+}
+
+.ov-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-when {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ov-card-body {
+  padding: 0 12px 12px;
+}
+
+/* Folded on screen; always in the PDF. */
+.ov-comments.is-folded,
+.ov-card-body.is-folded {
+  display: none;
+}
+
+.ov-card-body p {
+  margin: 0 0 8px;
+}
+
+.ov-shot {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  margin: 0 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.ov-thread {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.ov-thread li {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--paper);
+  white-space: pre-wrap;
+}
+
+.ov-thread li.by-claude {
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+}
+
+.ov-solution {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--review_ready);
+  border-radius: 0 6px 6px 0;
+  background: var(--review_ready-soft);
+}
+
+.ov-empty {
+  padding: 24px;
+  text-align: center;
+}
+
+.ov-foot {
+  margin-top: 16px;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .ov-row {
+    grid-template-columns: 16px auto 1fr;
+  }
+  .ov-counts,
+  .ov-visitors {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+  .ov-legend {
+    margin-left: 0;
+  }
+}
+
+/* Export PDF: the browser's print dialog, "Save as PDF". */
+@media print {
+  body {
+    background: #fff;
+    font-size: 12px;
+  }
+  .ov {
+    max-width: none;
+    padding: 0;
+  }
+  .ov-tools,
+  .ov-filters,
+  .ov-open,
+  .ov-caret {
+    display: none !important;
+  }
+  .ov-map {
+    border: 0;
+  }
+  .ov-card {
+    break-inside: avoid;
+  }
+  /* Every page's comments, each with its thread, also when folded on screen. */
+  .ov-comments,
+  .ov-card-body {
+    display: block !important;
+  }
+  .ov-comments {
+    background: none;
+  }
+  .ov-row,
+  .ov-card-head {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .ov-text {
+    white-space: normal;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

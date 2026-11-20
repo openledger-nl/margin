@@ -84,6 +84,13 @@ export function createExtensionHost(opts: { portName?: string } = {}): Host {
       },
     },
 
+    projects: {
+      list: () => op('projects', {}),
+      pull: (id) => op('pull', id === undefined ? {} : { id }),
+      send: (decisions) => op('send', { decisions }),
+      discard: (id) => op('discard', { id }),
+    },
+
     settings: {
       async get(key) {
         return (await chrome.storage.local.get(key))[key];
@@ -157,6 +164,8 @@ export function createExtensionHost(opts: { portName?: string } = {}): Host {
     },
 
     openHelp: (section) => void sendMessage({ type: 'open-help', section }).catch(() => {}),
+    openOverview: (target) => void sendMessage({ type: 'open-overview', ...target }).catch(() => {}),
+    recordVisit: (url, title) => void sendMessage({ type: 'visit', url, title }).catch(() => {}),
 
     alive,
   };
