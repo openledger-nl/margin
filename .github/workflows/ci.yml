@@ -244,7 +244,7 @@ jobs:
             exit 0
           fi
           npm install -g npm@latest # trusted publishing needs npm 11.5.1 or newer
-          npm publish "release/browser-review-mcp-$VERSION.tgz" --access public --provenance
+          npm publish "./release/browser-review-mcp-$VERSION.tgz" --access public --provenance # "./": npm reads "release/..." as a GitHub repo
 
   browser-review-chrome-web-store:
     name: Browser Review - upload to the Chrome Web Store
