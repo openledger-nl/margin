@@ -13,7 +13,9 @@ import { OVERVIEW_HTML } from './overview-page.ts';
 import type { Visits } from './visits.ts';
 import type { Config } from './config.ts';
 import type { FsDb } from './fs-db.ts';
-import { HELP_HTML } from './help.ts';
+import { helpHtml } from './help.ts';
+import type { Brand } from './brand.ts';
+import type { Settings } from './settings.ts';
 import type { Overlay } from './overlay.ts';
 import type { Caller, TokenKind, Tokens } from './tokens.ts';
 import { InputError, parseCreateInput, parseObject, str } from './validate.ts';
@@ -28,6 +30,10 @@ export interface HubDeps {
   /** overview.js, the overview page's script (built with margin.js). */
   overviewScript?: Overlay | null;
   visits: Visits;
+  /** brand.json and the logo: the company's look on the customer side. */
+  brand: Brand;
+  /** review.json: focus pages and who sees whose feedback. */
+  settings: Settings;
   /** Called after a visit (the hub rewrites site-map.md). */
   onVisit?: () => void;
   log?: (msg: string) => void;
@@ -106,7 +112,7 @@ class RateLimit {
 }
 
 export function createHandler(deps: HubDeps): (req: IncomingMessage, res: ServerResponse) => void {
-  const { config, store, db, tokens, overlay, visits } = deps;
+  const { config, store, db, tokens, overlay, visits, brand, settings } = deps;
   const overviewScript = deps.overviewScript ?? null;
   const log = deps.log ?? ((msg: string) => console.error(`[margin-hub] ${msg}`));
   const now = deps.now ?? (() => new Date());
@@ -136,6 +142,17 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
     return { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' };
   }
 
+  /** A comment this customer may see: everyone's when the project shares, else only their own. */
+  function visibleTo(c: Comment, name: string): boolean {
+    return settings.shares(name) || (c.messages[0]?.author === 'user' && c.messages[0].name === name);
+  }
+
+  async function mustSee(id: number, name: string): Promise<Comment> {
+    const c = await store.mustGet(id);
+    if (!visibleTo(c, name)) throw new HttpError(404, `Comment #${id} does not exist.`);
+    return c;
+  }
+
   async function review(req: IncomingMessage, parts: string[]): Promise<{ status: number; body: unknown }> {
     const who = await caller(req, 'reviewer');
     const method = req.method ?? 'GET';
@@ -143,10 +160,17 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
 
     // The overlay's first call: checks the token and learns whose messages are "You".
     if (resource === 'me' && !rawId && method === 'GET') {
-      return { status: 200, body: { name: who.name, project: config.project, welcome: config.welcome } };
+      const s = settings.get();
+      return {
+        status: 200,
+        body: { name: who.name, project: config.project, welcome: config.welcome, share: settings.shares(who.name), focusPages: s.focusPages },
+      };
     }
     if (resource === 'visits' && !rawId) {
-      if (method === 'GET') return { status: 200, body: { visits: visits.list() } };
+      if (method === 'GET') {
+        const all = visits.list();
+        return { status: 200, body: { visits: settings.shares(who.name) ? all : all.filter((v) => v.by === who.name) } };
+      }
       if (method === 'POST') {
         const body = parseObject(await readBody(req, SMALL_BODY));
         const url = str(body.url, 'url', 2048);
@@ -159,7 +183,7 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
       }
     }
     if (resource === 'comments' && !rawId) {
-      if (method === 'GET') return { status: 200, body: await store.list() };
+      if (method === 'GET') return { status: 200, body: (await store.list()).filter((c) => visibleTo(c, who.name)) };
       if (method === 'POST') {
         const input = parseCreateInput(await readBody(req, COMMENT_BODY));
         if (!isWebUrl(input.url) || pageKey(input.url).origin !== config.origin) {
@@ -173,9 +197,9 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
     }
     if (resource === 'comments' && rawId) {
       const id = idParam(rawId);
-      if (method === 'GET' && !action) return { status: 200, body: await store.mustGet(id) };
+      if (method === 'GET' && !action) return { status: 200, body: await mustSee(id, who.name) };
       if (method === 'DELETE' && !action) {
-        const c = await store.mustGet(id);
+        const c = await mustSee(id, who.name);
         const first = c.messages[0];
         if (first?.author !== 'user' || first.name !== who.name) throw new HttpError(403, 'You can only delete your own comments.');
         if (!canDelete(c)) throw new HttpError(409, `Comment #${id} can't be deleted while it is ${c.status.replace('_', ' ')}.`);
@@ -183,6 +207,7 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
         return { status: 200, body: { ok: true } };
       }
       if (method === 'POST') {
+        await mustSee(id, who.name);
         const body = parseObject(await readBody(req, SMALL_BODY));
         if (action === 'reply') return { status: 200, body: await store.addMessage(id, 'user', str(body.body, 'body', 20000), who.name) };
         if (action === 'accept') return { status: 200, body: await store.accept(id, who.name) };
@@ -193,7 +218,10 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
       }
     }
     if (resource === 'screenshots' && rawId && !action && method === 'GET') {
-      const dataUrl = await store.readScreenshot(idParam(rawId));
+      const shotId = idParam(rawId);
+      const owner = (await store.list()).find((c) => c.screenshots.some((sh) => sh.id === shotId));
+      if (!owner || !visibleTo(owner, who.name)) throw new HttpError(404, 'Screenshot not found.');
+      const dataUrl = await store.readScreenshot(shotId);
       if (!dataUrl) throw new HttpError(404, 'Screenshot not found.');
       return { status: 200, body: { dataUrl } };
     }
@@ -216,6 +244,14 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
 
     if (resource === 'visits' && !rawId && method === 'GET') {
       return { status: 200, body: { visits: visits.list() } };
+    }
+    if (resource === 'settings' && !rawId) {
+      if (method === 'GET') return { status: 200, body: settings.get() };
+      if (method === 'PUT' || method === 'POST') return { status: 200, body: await settings.set(await readBody(req, SMALL_BODY)) };
+    }
+    if (resource === 'reviewers' && !rawId && method === 'GET') {
+      const list = (await tokens.list()).filter((t) => t.kind === 'reviewer');
+      return { status: 200, body: { reviewers: list.map((t) => ({ name: t.name, lastUsed: t.lastUsed, expires: t.expires })) } };
     }
     if (resource === 'project' && !rawId && method === 'GET') {
       return { status: 200, body: { name: config.project, origin: config.origin, version: VERSION, you: who.name } };
@@ -283,13 +319,32 @@ export function createHandler(deps: HubDeps): (req: IncomingMessage, res: Server
 
     if (path === '/healthz' && method === 'GET') return send(res, 200, { ok: true, version: VERSION });
     if (path === '/help' && method === 'GET') {
+      const b = await brand.publicJson();
       res.writeHead(200, {
         ...COMMON_HEADERS,
         'Content-Type': 'text/html; charset=utf-8',
-        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
-        'Cache-Control': 'public, max-age=300',
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'",
+        'Cache-Control': 'no-cache',
       });
-      res.end(HELP_HTML);
+      res.end(helpHtml(b));
+      return;
+    }
+    // Public: only what any visitor of the staging site sees anyway (the toolbar's look).
+    if (path === '/brand.json' && method === 'GET') {
+      return send(res, 200, await brand.publicJson(), { 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' });
+    }
+    if (path === '/brand/logo' && method === 'GET') {
+      const b = await brand.get();
+      if (!b.logo) return send(res, 404, { error: 'No logo: add logo.svg or logo.png to the data folder.' });
+      res.writeHead(200, {
+        ...COMMON_HEADERS,
+        'Content-Type': b.logo.type,
+        // An SVG only ever goes in an <img>; this also stops scripts when opened directly.
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+        'Cross-Origin-Resource-Policy': 'cross-origin',
+        'Cache-Control': url.searchParams.get('v') === b.logo.version ? 'public, max-age=31536000, immutable' : 'no-cache',
+      });
+      res.end(b.logo.data);
       return;
     }
     if (path === '/overview' && method === 'GET') {

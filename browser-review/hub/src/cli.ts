@@ -10,6 +10,8 @@ import { ConfigError, readConfig, type Config } from './config.ts';
 import { FsDb } from './fs-db.ts';
 import { loadOverlay } from './overlay.ts';
 import { Visits } from './visits.ts';
+import { Brand, readBrand } from './brand.ts';
+import { Settings } from './settings.ts';
 import { writeFileAtomic } from './files.ts';
 import { TokenError, Tokens, type TokenKind } from './tokens.ts';
 import { VERSION } from './version.ts';
@@ -28,13 +30,18 @@ Commands (in Docker: docker compose exec margin margin <command>):
   token list                                   all tokens, without the secrets
   token revoke "<name>"                        stop a token working, right away
   sri                                          the <script> tag for your staging site
+  brand check                                  what the hub finds in brand.json and the logo
+
+Your own look on the customer side: brand.json ({ "name", "color", "toolbar" })
+and logo.svg or logo.png (at most 200 KB) in the data folder. Picked up by itself.
 
 Environment:
   MARGIN_PROJECT   project name, for example acme-shop            (required)
   MARGIN_ORIGIN    the staging site, https://staging.acme.com      (required)
   MARGIN_DATA      data folder, default /data/.margin (a volume, never the webroot)
   PORT             default 4780
-  MARGIN_COMMENTS_PER_HOUR   per review token, default 60`;
+  MARGIN_COMMENTS_PER_HOUR   per review token, default 60
+  MARGIN_WELCOME   the customer's welcome text, {name} for theirs`;
 
 function fail(message: string): never {
   console.error(message);
@@ -58,16 +65,19 @@ async function serve(config: Config): Promise<void> {
   const store = new Store(db);
   const tokens = new Tokens(config.dataDir);
   const visits = await Visits.open(config.dataDir);
+  const settings = await Settings.open(config.dataDir);
+  const brand = new Brand(config.dataDir, (msg) => console.error(`[margin-hub] ${msg}`));
   const overlay = await loadOverlay(overlayPath());
   const overviewScript = await loadOverlay(join(dirname(overlayPath()), 'overview.js'));
   // site-map.md: every page with its visitors and feedback, rewritten (at most once a second) after a change.
   const siteMap = debounced(1000, async () => {
-    const md = formatSiteMap(buildSiteMap(await store.list(), visits.list()), { project: config.project, origin: config.origin });
+    const md = formatSiteMap(buildSiteMap(await store.list(), visits.list(), settings.get().focusPages), { project: config.project, origin: config.origin });
     await writeFileAtomic(join(config.dataDir, 'site-map.md'), md);
   });
   db.onChange = siteMap;
+  settings.onChange = siteMap;
   siteMap();
-  const server = createServer(createHandler({ config, store, db, tokens, overlay, overviewScript, visits, onVisit: siteMap }));
+  const server = createServer(createHandler({ config, store, db, tokens, overlay, overviewScript, visits, brand, settings, onVisit: siteMap }));
   server.requestTimeout = 60_000;
   server.headersTimeout = 20_000;
   await new Promise<void>((resolve) => server.listen(config.port, config.host, resolve));
@@ -135,6 +145,19 @@ Pinned to ${VERSION}, the browser checks the file:
   <script src="/__margin/margin-${VERSION}.js" integrity="${overlay.integrity}" crossorigin="anonymous" defer></script>`);
 }
 
+async function brandCheck(config: Config): Promise<void> {
+  const b = await readBrand(config.dataDir);
+  console.log(`In ${config.dataDir}:`);
+  console.log(`  name     ${b.name ?? '(none: "Margin")'}`);
+  console.log(`  color    ${b.color ?? '(none: Margin green)'}`);
+  console.log(`  toolbar  ${b.toolbar ?? '(none: Margin dark)'}`);
+  console.log(`  logo     ${b.logo ? `${b.logo.type}, ${Math.round(b.logo.data.length / 1024)} KB` : '(none: the Margin mark)'}`);
+  if (b.problems.length === 0) return console.log('\nAll good.');
+  console.log('\nNot used:');
+  for (const p of b.problems) console.log(`  - ${p}`);
+  process.exitCode = 1;
+}
+
 const [command = 'serve', ...args] = process.argv.slice(2);
 if (command === '--version' || command === '-v') {
   console.log(VERSION);
@@ -146,6 +169,7 @@ if (command === '--version' || command === '-v') {
     if (command === 'serve') await serve(config);
     else if (command === 'token') await token(config, args);
     else if (command === 'sri') await sri();
+    else if (command === 'brand' && args[0] === 'check') await brandCheck(config);
     else fail(`Unknown command "${command}". See margin --help.`);
   } catch (err) {
     if (err instanceof ConfigError || err instanceof TokenError) fail(err.message);

@@ -11,6 +11,8 @@ import { ConfigError, readConfig, type Config } from './config.ts';
 import { FsDb } from './fs-db.ts';
 import { Tokens } from './tokens.ts';
 import { Visits } from './visits.ts';
+import { Brand } from './brand.ts';
+import { Settings } from './settings.ts';
 
 const STAGING = 'https://staging.acme.com';
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
@@ -42,6 +44,7 @@ let bob: string;
 let andor: string;
 let config: Config;
 let visits: Visits;
+let settings: Settings;
 
 before(async () => {
   dir = await mkdtemp(join(tmpdir(), 'margin-app-'));
@@ -53,7 +56,10 @@ before(async () => {
   andor = await tokens.add('developer', 'Andor');
   const overlay = { code: Buffer.from('console.log("margin")'), integrity: 'sha384-test' };
   visits = await Visits.open(dir);
-  server = createServer(createHandler({ config, store: new Store(db), db, tokens, overlay, visits, log: () => {} }));
+  settings = await Settings.open(dir);
+  // These tests are about one shared review; the private default has its own tests.
+  await settings.set({ share: true });
+  server = createServer(createHandler({ config, store: new Store(db), db, tokens, overlay, visits, brand: new Brand(dir), settings, log: () => {} }));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -137,6 +143,60 @@ describe('customer to developer and back', () => {
   });
 });
 
+describe('private by default, and focus pages', () => {
+  it('each customer only sees their own feedback unless the developer shares it', async () => {
+    // One of Anna's comments from the tests above (a new one would hit the test's rate limit).
+    const all = (await call('GET', '/api/dev/comments', { token: andor })).body.comments as Comment[];
+    const mine = all.find((c) => c.messages[0]?.name === 'Anna (client)')!;
+    const shared = await settings.get();
+    try {
+      // The developer switches sharing off for the project, and on for Bob.
+      const set = await call('PUT', '/api/dev/settings', { token: andor, body: { share: false, shareFor: { Bob: true }, focusPages: [{ path: '/pricing/', note: 'Check the prices' }] } });
+      assert.deepEqual(set.body.focusPages, [{ path: '/pricing', note: 'Check the prices' }]);
+      const forAnna = (await call('GET', '/api/review/comments', asCustomer(anna))).body as Comment[];
+      assert.ok(forAnna.every((c) => c.messages[0]?.name === 'Anna (client)'));
+      const forBob = (await call('GET', '/api/review/comments', asCustomer(bob))).body as Comment[];
+      assert.ok(forBob.some((c) => c.id === mine.id), 'Bob shares');
+      await settings.set({ share: false, focusPages: [{ path: '/pricing', note: '' }] });
+      assert.equal((await call('GET', `/api/review/comments/${mine.id}`, asCustomer(bob))).status, 404);
+      assert.equal((await call('POST', `/api/review/comments/${mine.id}/reply`, { ...asCustomer(bob), body: { body: 'hi' } })).status, 404);
+      const me = (await call('GET', '/api/review/me', asCustomer(bob))).body;
+      assert.deepEqual([me.share, me.focusPages], [false, [{ path: '/pricing', note: '' }]]);
+      // Developers always see everything.
+      assert.ok(((await call('GET', '/api/dev/comments', { token: andor })).body.comments as Comment[]).some((c) => c.id === mine.id));
+      const reviewers = (await call('GET', '/api/dev/reviewers', { token: andor })).body.reviewers.map((r: { name: string }) => r.name);
+      assert.ok(reviewers.includes('Bob') && !reviewers.includes('Andor'));
+    } finally {
+      await settings.set(shared);
+    }
+  });
+
+  it('checks the settings', async () => {
+    assert.equal((await call('PUT', '/api/dev/settings', { token: andor, body: { share: 'yes' } })).status, 400);
+    assert.equal((await call('PUT', '/api/review/comments', asCustomer(anna))).status, 404);
+    assert.equal((await call('PUT', '/api/dev/settings', { ...asCustomer(anna), body: {} })).status, 403);
+  });
+});
+
+describe('brand', () => {
+  it('serves the company look and logo, and falls back to Margin when broken', async () => {
+    const { writeFile, rm: remove } = await import('node:fs/promises');
+    assert.deepEqual(await (await fetch(`${base}/brand.json`)).json(), { name: null, color: null, toolbar: null, logo: null });
+    await writeFile(join(dir, 'brand.json'), JSON.stringify({ name: 'Acme', color: '#E45', toolbar: 'nope' }));
+    await writeFile(join(dir, 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1"/></svg>');
+    const b = await (await fetch(`${base}/brand.json`)).json();
+    assert.equal(b.name, 'Acme');
+    assert.equal(b.color, '#ee4455');
+    assert.equal(b.toolbar, null, 'a bad color is left out');
+    const logo = await fetch(`${base}/${b.logo}`);
+    assert.equal(logo.headers.get('content-type'), 'image/svg+xml');
+    assert.match(logo.headers.get('content-security-policy') ?? '', /default-src 'none'/);
+    assert.match(await (await fetch(`${base}/help`)).text(), /Powered by <a href="https:\/\/github.com\/openledger-nl\/margin"/);
+    await remove(join(dir, 'brand.json'));
+    await remove(join(dir, 'logo.svg'));
+  });
+});
+
 describe('visits', () => {
   it('records the pages customers look at, only on the staging site, and shows them to developers', async () => {
     const ok = await call('POST', '/api/review/visits', { ...asCustomer(anna), body: { url: `${STAGING}/pricing?ref=mail`, title: 'Pricing' } });
@@ -161,7 +221,7 @@ describe('visits', () => {
 describe('tokens', () => {
   it('tells the overlay whose review token it has', async () => {
     const me = await call('GET', '/api/review/me', asCustomer(anna));
-    assert.deepEqual(me.body, { name: 'Anna (client)', project: config.project, welcome: null });
+    assert.deepEqual(me.body, { name: 'Anna (client)', project: config.project, welcome: null, share: true, focusPages: [] });
     assert.equal((await call('GET', '/api/review/me', { token: andor })).status, 403);
   });
 
