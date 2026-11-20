@@ -14,10 +14,23 @@ any other agent that supports MCP.
   **review ready** with a short note on how it solved it. You **accept** it or
   **reopen** it in the browser.
 
-```
-Brave extension  <---- WebSocket ---->  browser-review-mcp  <-- MCP (stdio) -->  your agent
-(overlay, sidebar,                      127.0.0.1:4777                           (starts it per session)
- comments in IndexedDB)                 (npx, a bridge)
+```mermaid
+flowchart LR
+  you(["You"])
+  subgraph browser["Your browser"]
+    app["Your dev app<br/>localhost, *.test, sites you turn on"]
+    ext["Margin extension<br/>overlay, sidebar<br/>comments in IndexedDB"]
+  end
+  mcp["browser-review-mcp<br/>a bridge, stores nothing"]
+  agent["Your coding agent<br/>Claude Code, Codex, ...<br/>in your app's project folder"]
+
+  you -->|"comment, remove, edit"| ext
+  ext -.->|"pins and previews on the page"| app
+  ext <-->|"WebSocket<br/>127.0.0.1:4777"| mcp
+  agent -->|"starts it per session (npx)"| mcp
+  mcp <-->|"MCP over stdio<br/>list_comments, start_work, submit_solution"| agent
+  agent -->|"fixes the code"| app
+  ext -->|"review ready: accept or reopen"| you
 ```
 
 You never start a server yourself: your agent starts `browser-review-mcp` with
@@ -274,6 +287,119 @@ Review ready the preview turns off, so you see what the code really does now.
 | `reply` | Write in the thread, for example to ask a question. |
 | `submit_solution` | Set to Review ready with a note and the changed files. |
 
+## Feedback from customers on staging (in progress)
+
+Customers, designers or a PM leave feedback on your **staging site** through a
+personal link, without installing anything. The **margin review hub** stores it
+on your own server, as Markdown with screenshots, and you pull it into the
+Margin extension with a developer token. Your agent then works on it as usual.
+
+### How it works
+
+```mermaid
+flowchart LR
+  customer(["Customer<br/>Anna (client)"])
+
+  subgraph custbrowser["Customer's browser"]
+    site["Staging site<br/>+ margin.js toolbar"]
+  end
+
+  subgraph server["Your staging server, in Docker"]
+    hub["margin review hub<br/>checks token, origin,<br/>rate limit"]
+    data[("/data/.margin<br/>JSON, Markdown, PNG<br/>token hashes")]
+    cli["margin token add<br/>/ revoke"]
+  end
+
+  subgraph devmachine["Your machine"]
+    ext["Margin extension<br/>developer token"]
+    mcp["browser-review-mcp"]
+    agent["Your coding agent"]
+  end
+
+  you(["You"])
+
+  customer -->|"opens<br/>?review_token=mrev_…"| site
+  site <-->|"comments, replies,<br/>accept, reopen<br/>review token"| hub
+  hub <--> data
+  cli -->|"writes"| data
+  ext <-->|"pull, in progress,<br/>review ready<br/>developer token"| hub
+  mcp <-->|"WebSocket"| ext
+  agent <-->|"MCP"| mcp
+  you -->|"docker compose exec"| cli
+```
+
+One comment, from the customer to your agent and back:
+
+```mermaid
+sequenceDiagram
+  actor You
+  participant Hub as margin hub (Docker)
+  actor Anna as Customer
+  participant Site as Staging site + margin.js
+  participant Ext as Margin extension
+  participant Agent as Your coding agent
+
+  You->>Hub: margin token add --reviewer "Anna (client)"
+  Hub-->>You: staging.acme.com/?review_token=mrev_…
+  You->>Anna: send the link
+  Anna->>Site: opens the link
+  Note over Site: keeps the token, removes it from the address bar
+  Anna->>Site: comments on an element
+  Site->>Hub: POST /api/review/comments (review token)
+  Note over Hub: checks token, origin and rate limit<br/>writes 0012.json, 0012.md and 0012-7.png
+  Ext->>Hub: GET /api/dev/comments?since=… (developer token)
+  Hub-->>Ext: new and changed comments
+  Agent->>Ext: list_comments, start_work (MCP)
+  Ext->>Hub: start_work: In progress
+  Note over Agent: fixes the code, you deploy to staging
+  Agent->>Ext: submit_solution (MCP)
+  Ext->>Hub: submit_solution: Review ready
+  Site->>Hub: GET /api/review/comments (every few seconds)
+  Hub-->>Site: Review ready, with the note
+  Anna->>Site: accept or reopen
+  Site->>Hub: POST /api/review/comments/12/accept
+```
+
+**Status:** the hub works (API, tokens, storage, Docker image). The toolbar
+customers see on staging (`margin.js`) and pulling from the extension are being
+built next; see [docs/hub-plan.md](docs/hub-plan.md).
+
+The hub runs next to your staging site, in Docker:
+
+```sh
+docker build -f hub/Dockerfile -t margin-hub:1.2.0 .     # from browser-review/
+```
+
+```yaml
+# docker-compose.yml of your staging site
+  margin:
+    image: margin-hub:1.2.0
+    environment:
+      MARGIN_PROJECT: acme-shop
+      MARGIN_ORIGIN: https://staging.acme.com
+    volumes:
+      - margin-data:/data
+```
+
+Route `/__margin/` to it in your web server, then create a link per customer
+and a token per developer, from inside the container:
+
+```sh
+docker compose exec margin margin token add --reviewer "Anna (client)" --expires 30
+docker compose exec margin margin token add --developer "Andor"
+docker compose exec margin margin token revoke "Anna (client)"
+```
+
+- **Review tokens** only work on your staging site and can only comment, reply,
+  accept and reopen. **Developer tokens** are refused when sent from a web page.
+- Every token has a name, shown with what it wrote. Only a hash is stored, the
+  token is shown once, and a revoke works right away. There is no admin API.
+- The feedback stays on your server, in a volume outside the webroot. Nothing
+  goes to a third party.
+
+Setup, the nginx rule, the API and where each file lives:
+[hub/README.md](hub/README.md).
+
 ## Where the data lives
 
 Comments, threads and screenshots are stored in the extension (IndexedDB in your
@@ -284,6 +410,9 @@ extension deletes them**.
 passes the agent's tool calls to the extension. With several agent sessions,
 the first one holds the port and the others go through it; when it closes,
 another takes over.
+
+Feedback from customers on staging lives in the hub's Docker volume on your
+server (`/data/.margin`), one Markdown file plus screenshots per comment.
 
 ## Security
 
@@ -298,16 +427,25 @@ another takes over.
   default except local addresses and dev domains, and you can make it stricter:
   localhost only.
 - Nothing leaves your machine: comments and screenshots stay in the browser and
-  only go to the agent sessions on this computer.
+  only go to the agent sessions on this computer. The only exception is the
+  review hub, if you run one: customers' feedback is stored on your own staging
+  server (see [Feedback from customers on staging](#feedback-from-customers-on-staging-in-progress)).
 
 ## Development
 
 Needs Node 26 (`nvm use` reads `.nvmrc`) and pnpm.
 
-Comment validation and status decisions live in `shared/src/rules.ts`; stores
-own persistence, counters and URL policy. `shared/src/crop.ts` calculates padded
-pixel boxes without browser APIs; `extension/src/crop.ts` draws them to PNG.
-`pnpm test` includes the shared crop boundary tests.
+Comment validation and status decisions live in `shared/src/rules.ts`, and the
+`Store` that applies them in `shared/src/store.ts`. The extension runs it over
+IndexedDB (`extension/src/idb.ts`), the review hub over files
+(`hub/src/fs-db.ts`). `shared/` may not use DOM or Node APIs, so it runs on
+every side. `shared/src/format.ts` turns a comment into the text the agent gets
+and the hub stores as Markdown. `shared/src/crop.ts` calculates padded pixel
+boxes without browser APIs; `extension/src/crop.ts` draws them to PNG.
+
+The review hub is its own package in `hub/` (see [hub/README.md](hub/README.md)):
+`pnpm --dir hub test`, `pnpm build:hub`, and the image with
+`docker build -f hub/Dockerfile -t margin-hub .`.
 
 ### Run the extension from source (hot reload)
 
@@ -390,7 +528,7 @@ Run these before committing (CI runs the same):
 ```sh
 pnpm typecheck
 pnpm test               # all tests (the MCP one runs it over stdio like Claude Code)
-pnpm build              # extension/dist, extension/dist-firefox, server/dist/cli.js
+pnpm build              # extension/dist, extension/dist-firefox, server/dist/cli.js, hub/dist/hub.js
 ```
 
 ## License

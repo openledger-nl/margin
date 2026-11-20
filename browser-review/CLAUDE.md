@@ -8,9 +8,13 @@ over MCP. See README.md for how it works and how to use it.
 ## Layout and commands
 
 ```
-shared/      types used by both sides, including the bridge protocol (BridgeCalls)
+shared/      types used by every side, including the bridge protocol (BridgeCalls),
+             the comment rules (rules.ts), the Store (store.ts) and formatComment
 server/      browser-review-mcp, published to npm: MCP over stdio + WebSocket bridge
-extension/   MV3 extension: background worker owns the data (store.ts over IndexedDB),
+hub/         margin review hub, a Docker image: customers comment on a staging site
+             with a review token, developers pull with a developer token. The shared
+             Store over files (fs-db.ts), comments also written as Markdown. hub/README.md
+extension/   MV3 extension: background worker owns the data (shared Store over IndexedDB, idb.ts),
              overlay (Preact in a Shadow DOM), threads side panel (panel.tsx;
              Firefox: sidebar_action), help page, notice popup.
              build.ts makes dist/ (Chromium) and, with --firefox, dist-firefox/
@@ -32,6 +36,7 @@ pnpm test            # all tests
 pnpm typecheck       # all packages
 pnpm package         # release/browser-review-<version>-chrome.zip and -firefox.zip
 pnpm publish:mcp     # publish browser-review-mcp to npm (only when the user asks)
+pnpm build:hub       # hub/dist/hub.js; image: docker build -f hub/Dockerfile -t margin-hub .
 ```
 
 After a change: run `pnpm typecheck`, `pnpm test` and `pnpm build`.
@@ -87,7 +92,7 @@ makes it a **major** bump (0.4.2 → 1.0.0), whatever the type. Breaking means t
 has to do something: the MCP tools change shape, the extension API changes, stored
 data or settings no longer load, the Node version requirement goes up.
 
-Scopes in use: `extension`, `mcp`, `shared`, `overlay`, `sidebar`, `help`, `deps`.
+Scopes in use: `extension`, `mcp`, `shared`, `hub`, `overlay`, `sidebar`, `help`, `deps`.
 
 Examples:
 
