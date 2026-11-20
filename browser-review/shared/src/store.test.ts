@@ -154,3 +154,26 @@ describe('list, delete, concurrency', () => {
     assert.equal(c.screenshots.length, 1);
   });
 });
+
+describe('who did it', () => {
+  it('stores the name on every message an action adds, and none without it', async () => {
+    const c = await store.create(base, 'Anna (client)');
+    assert.equal(c.messages[0]?.name, 'Anna (client)');
+    await store.startWork(c.id, 'Andor');
+    await store.submitSolution(c.id, 'Less padding.', [], 'Andor');
+    const reopened = await store.reopen(c.id, 'Still too much', 'Anna (client)');
+    assert.deepEqual(
+      reopened.messages.map((m) => [m.author, m.name]),
+      [
+        ['user', 'Anna (client)'],
+        ['system', 'Andor'],
+        ['system', 'Andor'],
+        ['system', 'Anna (client)'],
+        ['user', 'Anna (client)'],
+        ['system', 'Anna (client)'],
+      ],
+    );
+    const local = await store.create(base);
+    assert.equal('name' in local.messages[0]!, false);
+  });
+});

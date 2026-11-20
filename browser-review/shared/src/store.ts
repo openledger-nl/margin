@@ -1,12 +1,7 @@
-// All review data, owned by the extension. The background worker is the only
-// user. Persistence is behind the Db interface: IndexedDB in the browser
-// (idb.ts), a Map in tests.
+// All review data and the one place that changes it. The extension's background
+// worker uses it over IndexedDB (extension/src/idb.ts), the review hub over files
+// (hub/src/fs-db.ts), tests over a Map. Persistence is behind the Db interface.
 import {
-  checkCreate,
-  checkPngDataUrl,
-  decide,
-  ReviewError,
-  type Action,
   pageKey,
   type Author,
   type Comment,
@@ -15,8 +10,18 @@ import {
   type ScreenshotMeta,
   type ScreenshotSource,
   type Status,
-} from '@brm/shared';
-import { isWebUrl } from './sites.ts';
+} from './index.ts';
+import { checkCreate, checkPngDataUrl, decide, ReviewError, type Action } from './rules.ts';
+
+/** An http or https URL. Which sites are allowed is up to the caller. */
+export function isWebUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 export interface ListFilter {
   origin?: string;
@@ -119,7 +124,8 @@ export class Store {
 
   // ---------- writing ----------
 
-  create(input: CreateCommentInput): Promise<Comment> {
+  /** by: who made it, for example the name of a hub token. Stored on its messages. */
+  create(input: CreateCommentInput, by?: string): Promise<Comment> {
     return this.#write(async () => {
       // Which sites are allowed is the background's call (sites.ts); here only web pages.
       if (!isWebUrl(input.url)) throw new ReviewError('bad_input', 'Only http and https pages.');
@@ -144,7 +150,7 @@ export class Store {
         createdAt: t,
         updatedAt: t,
       };
-      await this.#message(c, 'user', body, t);
+      await this.#message(c, 'user', body, t, by);
       if (page) await this.#shot(c, 'page', 'initial', page);
       if (element) await this.#shot(c, 'element', 'initial', element);
       await this.#db.putComment(c);
@@ -152,28 +158,28 @@ export class Store {
     });
   }
 
-  addMessage(id: number, author: Author, body: string): Promise<Comment> {
-    return this.#act(id, { type: 'message', author, body });
+  addMessage(id: number, author: Author, body: string, by?: string): Promise<Comment> {
+    return this.#act(id, { type: 'message', author, body }, by);
   }
 
-  /** Claude: open or in progress -> in progress. */
-  startWork(id: number): Promise<Comment> {
-    return this.#act(id, { type: 'start_work' });
+  /** Agent: open or in progress -> in progress. */
+  startWork(id: number, by?: string): Promise<Comment> {
+    return this.#act(id, { type: 'start_work' }, by);
   }
 
-  /** Claude: open or in progress -> review ready, with a note on how it was solved. */
-  submitSolution(id: number, note: string, files: string[] = []): Promise<Comment> {
-    return this.#act(id, { type: 'submit_solution', note, files });
+  /** Agent: open or in progress -> review ready, with a note on how it was solved. */
+  submitSolution(id: number, note: string, files: string[] = [], by?: string): Promise<Comment> {
+    return this.#act(id, { type: 'submit_solution', note, files }, by);
   }
 
   /** User: review ready -> accepted. */
-  accept(id: number): Promise<Comment> {
-    return this.#act(id, { type: 'accept' });
+  accept(id: number, by?: string): Promise<Comment> {
+    return this.#act(id, { type: 'accept' }, by);
   }
 
   /** User: review ready or accepted -> open. The old solution moves into the thread. */
-  reopen(id: number, body?: string): Promise<Comment> {
-    return this.#act(id, { type: 'reopen', body });
+  reopen(id: number, body?: string, by?: string): Promise<Comment> {
+    return this.#act(id, { type: 'reopen', body }, by);
   }
 
   delete(id: number): Promise<void> {
@@ -216,18 +222,18 @@ export class Store {
     });
   }
 
-  async #message(c: Comment, author: Author, body: string, t: string): Promise<void> {
-    c.messages.push({ id: await this.#db.nextId('message'), author, body, createdAt: t });
+  async #message(c: Comment, author: Author, body: string, t: string, by?: string): Promise<void> {
+    c.messages.push({ id: await this.#db.nextId('message'), author, body, createdAt: t, ...(by ? { name: by } : {}) });
     c.updatedAt = t;
   }
 
-  #act(id: number, action: Action): Promise<Comment> {
+  #act(id: number, action: Action, by?: string): Promise<Comment> {
     return this.#update(id, async (c) => {
       const t = now();
       const outcome = decide(c, action, t);
       c.status = outcome.status;
       c.solution = outcome.solution;
-      for (const message of outcome.messages) await this.#message(c, message.author, message.body, t);
+      for (const message of outcome.messages) await this.#message(c, message.author, message.body, t, by);
     });
   }
 

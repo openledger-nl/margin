@@ -1,8 +1,10 @@
-// Types and small helpers shared by the MCP process and the extension.
-// Keep this file free of Node or DOM APIs: it runs in both places.
+// Types and small helpers shared by the MCP process, the extension and the review hub.
+// Keep this file free of Node or DOM APIs: it runs in all of them (see web.d.ts).
 
 export { ReviewError, decide, checkCreate, canDelete, checkPngDataUrl, type ReviewErrorCode, type Action, type Outcome } from './rules.ts';
 export { cropBox } from './crop.ts';
+export { Store, MemoryDb, isWebUrl, type Db, type StoredShot, type Counter, type ListFilter } from './store.ts';
+export { formatComment, formatListLine } from './format.ts';
 
 export const STATUSES = ['open', 'in_progress', 'review_ready', 'accepted'] as const;
 export type Status = (typeof STATUSES)[number];
@@ -59,6 +61,8 @@ export interface Message {
   author: Author;
   body: string;
   createdAt: string;
+  /** Who wrote it, when known: the name of the review hub token that was used ("Anna (client)"). */
+  name?: string;
 }
 
 export interface Solution {

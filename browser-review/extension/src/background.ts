@@ -43,7 +43,7 @@ import {
   type SiteSettings,
 } from './sites.ts';
 import { IdbDb } from './idb.ts';
-import { Store } from './store.ts';
+import { Store } from '@brm/shared';
 import { cropToPng } from './crop.ts';
 
 const WS_URL = `ws://127.0.0.1:${DEFAULT_PORT}/ws`;

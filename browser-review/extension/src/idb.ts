@@ -1,7 +1,7 @@
 // IndexedDB storage for the Store, in the background service worker.
 // Comments (with their thread and screenshot list) in one store, PNG data in another.
 import type { Comment } from '@brm/shared';
-import type { Counter, Db, StoredShot } from './store.ts';
+import type { Counter, Db, StoredShot } from '@brm/shared';
 
 const NAME = 'browser-review';
 const VERSION = 1;

@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import * as z from 'zod';
 import { STATUSES, STATUS_LABELS, type ScreenshotKind } from '@brm/shared';
 import type { BridgeLike } from './bridge.ts';
-import { formatComment, formatListLine } from './format.ts';
+import { formatComment, formatListLine } from '@brm/shared';
 
 type Content =
   | { type: 'text'; text: string }

@@ -1,4 +1,5 @@
-import { KIND_LABELS, STATUS_LABELS, isPreviewActive, type Comment } from '@brm/shared';
+// Comments as text: the MCP tools show it to the agent, the review hub stores it as Markdown.
+import { KIND_LABELS, STATUS_LABELS, isPreviewActive, type Comment, type Message } from './index.ts';
 
 function quote(s: string, max = 80): string {
   const flat = s.replace(/\s+/g, ' ').trim();
@@ -61,7 +62,7 @@ export function formatComment(c: Comment): string {
 
   out.push('', '## Thread');
   for (const m of c.messages) {
-    const who = m.author === 'user' ? 'User' : m.author === 'claude' ? 'Agent' : 'Status';
+    const who = author(m);
     out.push(`- ${who} (${m.createdAt}): ${m.body.replace(/\n/g, '\n  ')}`);
   }
 
@@ -92,4 +93,9 @@ function nextStepHint(c: Comment): string {
     case 'accepted':
       return 'Accepted by the user. Nothing to do.';
   }
+}
+
+function author(m: Message): string {
+  const role = m.author === 'user' ? 'User' : m.author === 'claude' ? 'Agent' : 'Status';
+  return m.name ? `${role} (${m.name})` : role;
 }
