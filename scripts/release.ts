@@ -22,6 +22,7 @@ export const VERSION_FILES = [
   'browser-review/package.json',
   'browser-review/shared/package.json',
   'browser-review/server/package.json',
+  'browser-review/hub/package.json',
   'browser-review/extension/package.json',
   'browser-review/extension/static/manifest.json',
   'github/package.json',

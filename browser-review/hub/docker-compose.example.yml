@@ -1,0 +1,17 @@
+# Add this service next to your staging site, then route /__margin/ to it in
+# your web server (see the README). Create tokens with:
+#   docker compose exec margin margin token add --reviewer "Anna (client)"
+#   docker compose exec margin margin token add --developer "Andor"
+services:
+  margin:
+    image: margin-hub:1.2.0          # an exact version, never :latest
+    restart: unless-stopped
+    environment:
+      MARGIN_PROJECT: acme-shop                  # shown in the Margin extension
+      MARGIN_ORIGIN: https://staging.acme.com    # the only site review links work on
+    volumes:
+      - margin-data:/data                        # the feedback, as Markdown + PNG in /data/.margin
+    # No ports: only your web server reaches the hub, over the compose network.
+
+volumes:
+  margin-data:

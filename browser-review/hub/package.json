@@ -1,0 +1,21 @@
+{
+  "name": "@brm/hub",
+  "version": "1.2.0",
+  "license": "MIT",
+  "private": true,
+  "description": "Margin review hub: customers leave feedback on a staging site, developers pull it. Runs in Docker.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node build.ts",
+    "start": "node src/cli.ts serve",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc -p ."
+  },
+  "devDependencies": {
+    "@brm/shared": "workspace:*",
+    "esbuild": "^0.28.2"
+  }
+}

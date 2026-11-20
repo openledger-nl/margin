@@ -9,7 +9,8 @@
   },
   "packageManager": "pnpm@12.9.1",
   "scripts": {
-    "build": "pnpm --dir extension build && pnpm --dir extension build:firefox && pnpm --dir server build",
+    "build": "pnpm --dir extension build && pnpm --dir extension build:firefox && pnpm --dir server build && pnpm --dir hub build",
+    "build:hub": "pnpm --dir hub build",
     "build:extension": "pnpm --dir extension build",
     "build:firefox": "pnpm --dir extension build:firefox",
     "build:mcp": "pnpm --dir server build",

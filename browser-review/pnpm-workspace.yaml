@@ -1,6 +1,7 @@
 packages:
   - shared
   - server
+  - hub
   - extension
   - demo
 allowBuilds:

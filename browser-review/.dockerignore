@@ -1,0 +1,12 @@
+# Docker build context is browser-review/ (for hub/Dockerfile): only what the hub needs.
+**/node_modules
+**/dist
+**/dist-*
+release
+demo
+docs
+extension
+server
+scripts
+.githooks
+*.log

@@ -214,6 +214,15 @@ importers:
         specifier: ^0.18.15
         version: 0.18.15
 
+  hub:
+    devDependencies:
+      '@brm/shared':
+        specifier: workspace:*
+        version: link:../shared
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+
   server:
     devDependencies:
       '@brm/shared':
