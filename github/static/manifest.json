@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Margin - Declutter GitHub homepage",
-  "version": "0.4.0",
+  "version": "1.2.0",
   "description": "A GitHub homepage with your repositories, your organizations and where you pushed last, without the clutter.",
   "minimum_chrome_version": "120",
   "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
