@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Margin Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script>
+  // index.html?embed: the board inside the VS Code mock (vscode.html), without header and feed
+  if (new URLSearchParams(location.search).has("embed")) {
+    document.documentElement.classList.add("embed");
+    document.documentElement.dataset.theme = "dark";
+  }
+</script>
+<style>
+/* embedded in the VS Code mock: VS Code's dark colors */
+:root.embed { --bg: #1F1F1F; --surface: #262626; --surface-2: #303030; --line: #353535; }
+.embed header, .embed .feed { display: none; }
+.embed .layout { grid-template-columns: 1fr; padding-top: 0; }
+.embed .team { padding-top: 12px; }
+
+
+/* team strip */
+.team {
+  display: flex; gap: 8px; padding: 14px 24px; overflow-x: auto; scrollbar-width: none;
+}
+.team::-webkit-scrollbar { display: none; }
+.person {
+  display: flex; align-items: center; gap: 10px; padding: 7px 12px 7px 7px; flex-shrink: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow);
+  transition: border-color .15s, opacity .15s;
+}
+.person:hover { border-color: var(--ink-3); }
+.person.dim { opacity: .45; }
+.person.on { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.person .who { display: flex; flex-direction: column; line-height: 1.2; text-align: left; }
+.person .name { font-weight: 500; font-size: 13px; }
+.person .branch { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.person .dots { display: flex; gap: 4px; margin-left: 4px; }
+
+
+/* layout */
+.layout {
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; padding: 6px 24px 32px;
+  align-items: start;
+}
+.board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.col { min-width: 0; }
+.col-head { display: flex; align-items: baseline; gap: 8px; padding: 6px 4px 4px; }
+.col-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.col-head .count { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.col-rule { font-size: 11.5px; color: var(--ink-3); padding: 0 4px 10px; }
+.cards { display: flex; flex-direction: column; gap: 10px; min-height: 60px; }
+
+/* card */
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+  box-shadow: var(--shadow); text-align: left; width: 100%; display: flex; flex-direction: column; gap: 9px;
+  transition: border-color .15s, box-shadow .3s;
+}
+.card:hover { border-color: var(--ink-3); }
+.card.dim { opacity: .35; }
+.card.flash { box-shadow: 0 0 0 3px var(--green-soft), var(--shadow); border-color: var(--green); }
+.card.suggested { background: transparent; border-style: dashed; box-shadow: none; }
+.card-top { display: flex; align-items: flex-start; gap: 8px; }
+.card-title { font-weight: 500; flex: 1; line-height: 1.35; }
+.card.shipped .card-title { color: var(--ink-2); }
+.card-id { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.chip .ahead { color: var(--ink-3); }
+.row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.agent-line { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); min-width: 0; }
+.agent-line .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-line .what code { font-family: var(--mono); font-size: 11.5px; }
+.agent-line.waiting .what { color: var(--amber); }
+.card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.card-foot .avatar { margin-left: auto; }
+.add-btn {
+  font-size: 12px; font-weight: 500; color: var(--green); padding: 3px 8px; border-radius: 6px;
+  border: 1px solid var(--green); margin-left: auto;
+}
+.add-btn:hover { background: var(--green-soft); }
+.new-card {
+  border: 1px dashed var(--line); border-radius: 10px; padding: 10px; color: var(--ink-3);
+  font-size: 12.5px; text-align: left; width: 100%;
+}
+.new-card:hover { border-color: var(--ink-3); color: var(--ink-2); }
+
+/* feed */
+.feed {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+  position: sticky; top: 16px; max-height: calc(100vh - 32px); display: flex; flex-direction: column;
+}
+.feed-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.feed-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.live { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--green); font-weight: 500; }
+.feed-head .replay { margin-left: auto; font-size: 12px; color: var(--ink-3); }
+.feed-head .replay:hover { color: var(--ink); }
+.catchup {
+  margin: 12px 14px 4px; padding: 10px 12px; border-radius: 8px; background: var(--green-soft);
+  font-size: 12.5px; color: var(--ink-2); display: flex; gap: 8px;
+}
+.catchup .spark { color: var(--green); flex-shrink: 0; }
+.catchup b { color: var(--ink); font-weight: 500; }
+.events { list-style: none; margin: 0; padding: 6px 14px 14px; overflow-y: auto; }
+.event { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.event:last-child { border-bottom: 0; }
+.event.new { animation: slidein .4s ease-out; }
+.event .txt { flex: 1; color: var(--ink-2); min-width: 0; overflow-wrap: anywhere; }
+.event .txt b { color: var(--ink); font-weight: 500; }
+.event .txt code { font-family: var(--mono); font-size: 11.5px; }
+.event time { font-family: var(--mono); font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+@keyframes slidein { from { opacity: 0; transform: translateY(-6px); } }
+
+/* drawer */
+.scrim {
+  position: fixed; inset: 0; background: rgba(14, 16, 22, .28); opacity: 0; pointer-events: none;
+  transition: opacity .2s; z-index: 10;
+}
+.scrim.open { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100%); background: var(--surface);
+  border-left: 1px solid var(--line); box-shadow: var(--shadow-lg); z-index: 11; overflow-y: auto;
+  transform: translateX(100%); transition: transform .25s cubic-bezier(.2, .8, .2, 1);
+}
+.drawer.open { transform: none; }
+.drawer-inner { padding: 20px 22px 32px; display: flex; flex-direction: column; gap: 20px; }
+.drawer h3 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.3; }
+.drawer h4 {
+  margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.d-head { display: flex; gap: 12px; align-items: flex-start; }
+.d-head h3 { flex: 1; }
+.kv { display: flex; flex-direction: column; gap: 8px; }
+.agent-box {
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;
+}
+.agent-box .top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.agent-box .top .state { margin-left: auto; font-size: 12px; color: var(--ink-3); }
+.agent-box .task { color: var(--ink-2); font-size: 12.5px; }
+.files { display: flex; flex-wrap: wrap; gap: 4px; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.list li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+.list li .mono { color: var(--ink); }
+.list li .right { margin-left: auto; }
+pre.context {
+  margin: 0; padding: 12px; border-radius: 8px; background: #0E1016; color: #B4BACB;
+  font: 11.5px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+pre.context .p { color: #4CC38A; }
+.note { font-size: 12px; color: var(--ink-3); margin: 6px 0 0; }
+
+/* ask palette */
+.palette {
+  position: fixed; left: 50%; top: 12vh; transform: translate(-50%, -8px); width: min(620px, calc(100% - 32px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-lg);
+  z-index: 21; opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s;
+}
+.palette.open { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+.scrim.ask { z-index: 20; }
+.palette form { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.palette .spark { color: var(--green); }
+.palette input {
+  flex: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink);
+}
+.palette input::placeholder { color: var(--ink-3); }
+.suggest { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px; }
+.suggest button {
+  font-size: 12.5px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2);
+}
+.suggest button:hover { border-color: var(--green); color: var(--ink); }
+.answer { padding: 4px 16px 16px; font-size: 13.5px; color: var(--ink-2); white-space: pre-wrap; min-height: 0; }
+.answer:empty { display: none; }
+.answer b { color: var(--ink); font-weight: 500; }
+.answer .src { display: block; margin-top: 10px; font-size: 11.5px; color: var(--ink-3); }
+
+/* responsive */
+@media (max-width: 1180px) {
+  .ask-btn { min-width: 0; }
+  .layout { grid-template-columns: 1fr; }
+  .feed { position: static; max-height: 420px; }
+}
+@media (max-width: 860px) {
+  .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  header, .team { padding-left: 16px; padding-right: 16px; }
+  .layout { padding: 6px 16px 24px; }
+  .board { grid-template-columns: 1fr; }
+  .ask-btn { min-width: 0; flex: 1; order: 5; }
+  .countdown .event { display: none; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="index.html">
+    <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#F4F1EA"/><path d="M64 448L64 64L176 64L256 212L336 64L448 64L448 448L336 448L336 236L256 372L176 236L176 448Z" fill="#2F9E6B"/><rect x="82" y="82" width="76" height="236" fill="#0E1016"/><path d="M96 104L124 124L96 144L96 133L109 124L96 115Z" fill="#4CC38A"/><rect x="130" y="135" width="20" height="9" fill="#4CC38A"/><rect x="98" y="164" width="48" height="9" fill="#B4BACB"/><rect x="98" y="186" width="32" height="9" fill="#B4BACB"/></svg>
+    <span>Margin Team</span>
+  </a>
+  <nav class="pages" aria-label="Pages"><a href="index.html" aria-current="page">Board</a><a href="start.html">Get started</a><a href="vscode.html">In VS Code</a></nav>
+  <div class="spacer"></div>
+  <div class="countdown"><span class="event">Harbour Hack ·</span> demo in <b id="countdown">05:42:10</b></div>
+  <button class="ask-btn" id="askBtn" type="button">
+    <span class="spark">✦</span> Ask the board <kbd>⌘K</kbd>
+  </button>
+  <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch light and dark">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
+  </button>
+</header>
+
+<nav class="team" id="team" aria-label="Team"></nav>
+
+<div class="layout">
+  <main class="board" id="board"></main>
+  <aside class="feed">
+    <div class="feed-head">
+      <h2>Activity</h2>
+      <span class="live"><span class="dot working"></span>live</span>
+      <button class="replay" id="replay" type="button">replay</button>
+    </div>
+    <div class="catchup">
+      <span class="spark">✦</span>
+      <span id="catchup"></span>
+    </div>
+    <ol class="events" id="events"></ol>
+  </aside>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Card"></aside>
+
+<div class="scrim ask" id="askScrim"></div>
+<div class="palette" id="palette" role="dialog" aria-label="Ask the board">
+  <form id="askForm">
+    <span class="spark">✦</span>
+    <input id="askInput" placeholder="Ask about the team, branches, PRs…" autocomplete="off">
+    <kbd>esc</kbd>
+  </form>
+  <div class="suggest" id="suggest">
+    <button type="button">What's blocking the demo?</button>
+    <button type="button">Who is working on auth?</button>
+    <button type="button">Catch me up on the last hour</button>
+    <button type="button">What is everyone doing?</button>
+  </div>
+  <div class="answer" id="answer"></div>
+</div>
+
+<script>
+// ---------- data (all made up; in the real thing it comes from git, terminals, Claude hooks and GitHub) ----------
+const PEOPLE = {
+  andor: { name: "Andor", color: "#2F9E6B" },
+  zeb:   { name: "Zeb",   color: "#3D6FD6" },
+  sam:   { name: "Sam",   color: "#B97A12" },
+  noor:  { name: "Noor",  color: "#9B5BC4" },
+};
+const COLUMNS = [
+  { id: "next",     title: "Up next",   rule: "no branch yet" },
+  { id: "building", title: "Building",  rule: "branch with commits or an agent" },
+  { id: "review",   title: "In review", rule: "pull request open" },
+  { id: "shipped",  title: "Shipped",   rule: "merged into main" },
+];
+
+// local CI: the repo's own CI checks, run on the laptop before every push
+const CHECKS = (t = "pass", te = "pass", b = "pass") => [{ name: "typecheck", state: t }, { name: "test", state: te }, { name: "build", state: b }];
+
+function initialState() {
+  return {
+    clock: 14 * 60 + 18,
+    cards: [
+      { id: 14, title: "Google sign-in on the login page", owner: "zeb", branch: "feat/login", ahead: 3, fromClaude: true,
+        agents: [{ id: "z1", state: "working", task: "Add Google sign-in with Supabase auth", doing: "editing <code>src/auth/google.ts</code>",
+          files: ["src/auth/google.ts", "src/auth/session.ts"] }],
+        terminals: [{ cmd: "pnpm dev", state: "run", note: "running" }],
+        local: { checks: CHECKS(), ago: "2m ago", unpushed: 1 },
+        commits: ["add Supabase client", "add Google provider config", "sign-in button"] },
+      { id: 15, title: "Live scoreboard over websockets", owner: "sam", branch: "feat/api-scores", ahead: 5,
+        agents: [{ id: "s1", state: "waiting", task: "Push score updates to all clients", doing: "asks Sam: Socket.IO or plain ws?",
+          files: ["src/api/scores.ts", "src/api/socket.ts"] }],
+        terminals: [{ cmd: "pnpm api", state: "run", note: "running" }],
+        local: { checks: CHECKS(), ago: "6m ago", unpushed: 0 },
+        commits: ["POST /scores", "score model", "socket server", "broadcast on insert", "client hook"] },
+      { id: 16, title: "Team page with members and avatars", owner: "andor", branch: "feat/team-page", ahead: 2,
+        agents: [{ id: "a1", state: "working", task: "Build the team page from the design", doing: "fixing <code>TeamPage.test.tsx</code>",
+          files: ["src/pages/TeamPage.tsx", "src/components/Avatar.tsx"] }],
+        terminals: [],
+        local: { checks: CHECKS("pass", "fail", "skip"), note: "2 failing", ago: "just now", unpushed: 2 },
+        commits: ["team page route", "avatar component"] },
+      { id: 12, title: "Navbar collapses on mobile", owner: "zeb", branch: "fix/navbar", ahead: 1,
+        pr: { n: 12, ci: "fail", ciNote: "lint", reviews: "1 comment" },
+        agents: [{ id: "z2", state: "working", task: "Fix the lint error on PR #12", doing: "editing <code>src/components/Navbar.tsx</code>",
+          files: ["src/components/Navbar.tsx"] }],
+        terminals: [], local: { checks: CHECKS(), ago: "12m ago", unpushed: 0 }, commits: ["hamburger menu under 640px"] },
+      { id: 11, title: "Seed script with demo teams", owner: "noor", branch: "feat/seed", ahead: 2,
+        pr: { n: 11, ci: "pass", reviews: "approved" }, agents: [], terminals: [], local: { checks: CHECKS(), ago: "16m ago", unpushed: 0 }, commits: ["seed 8 teams", "random scores"] },
+      { id: 17, title: "Leaderboard animations", owner: null },
+      { id: 18, title: "Share your score as an image", owner: null },
+      { id: 19, title: "Rate-limit POST /scores", owner: null, suggested: "TODO left by Sam's Claude in src/api/scores.ts" },
+      { id: 9, title: "Database schema for teams and scores", owner: "noor", branch: "feat/schema", pr: { n: 9, merged: true }, commits: ["schema", "RLS policies"] },
+      { id: 8, title: "Project setup: Vite, Tailwind, Supabase", owner: "andor", branch: "chore/setup", pr: { n: 8, merged: true }, commits: ["init"] },
+    ],
+    events: [
+      { t: -14, who: "noor", text: "<b>Noor</b> opened <b>PR #11</b> Seed script with demo teams" },
+      { t: -9,  who: "zeb",  text: "<b>PR #12</b>: CI failed on <code>lint</code>" },
+      { t: -7,  who: "zeb",  text: "<b>Zeb's Claude</b> started on <b>fix/navbar</b>: fix the lint error" },
+      { t: -4,  who: "sam",  text: "<b>Sam's Claude</b> is waiting for Sam: Socket.IO or plain ws?" },
+      { t: -2,  who: "andor", text: "<b>Andor's Claude</b> tried to push feat/team-page: local CI failed on <code>test</code>, push held" },
+    ],
+    filter: null,
+    flash: null,
+  };
+}
+
+// column is derived from the branch, as the real board would do it
+function columnOf(c) {
+  if (c.pr?.merged) return "shipped";
+  if (c.pr) return "review";
+  if (c.branch) return "building";
+  return "next";
+}
+
+// the simulated afternoon: one step every few seconds
+const SCRIPT = [
+  s => { const a = agent(s, 14, "z1"); a.doing = "editing <code>src/pages/LoginPage.tsx</code>"; addFile(a, "src/pages/LoginPage.tsx");
+         log(s, "zeb", "<b>Zeb's Claude</b> edited <code>LoginPage.tsx</code> on feat/login"); return 14; },
+  s => { const a = agent(s, 15, "s1"); a.state = "working"; a.doing = "switching to plain <code>ws</code>";
+         log(s, "sam", "<b>Sam</b> answered; <b>Sam's Claude</b> is working again"); return 15; },
+  s => { const c = card(s, 12); c.agents[0].doing = "pushed <code>fix lint: unused import</code>"; c.pr.ci = "run"; c.ahead = 2; c.commits.push("fix lint: unused import");
+         c.local = { checks: CHECKS(), ago: "just now", unpushed: 0 };
+         log(s, "zeb", "<b>Zeb's Claude</b>: local CI passed, pushed a fix to <b>PR #12</b>; GitHub CI running"); return 12; },
+  s => { const c = card(s, 16); c.local = { checks: CHECKS(), ago: "just now", unpushed: 0 }; c.commits.push("fix team page test");
+         c.agents[0].doing = "editing <code>src/pages/TeamPage.tsx</code>";
+         log(s, "andor", "<b>Andor's Claude</b> fixed the test: local CI passed, feat/team-page pushed"); return 16; },
+  s => { const c = card(s, 12); c.pr.ci = "pass"; c.agents[0].state = "idle"; c.agents[0].doing = "done: lint fixed";
+         log(s, "zeb", "<b>PR #12</b>: CI passed"); return 12; },
+  s => { const c = card(s, 11); c.pr.merged = true;
+         log(s, "noor", "<b>Noor</b> merged <b>PR #11</b> Seed script with demo teams"); return 11; },
+  s => { s.cards.splice(5, 0, { id: 20, title: "Deploy to Fly.io with a demo URL", owner: "noor", branch: "chore/deploy", ahead: 0, fromClaude: true,
+           agents: [{ id: "n1", state: "working", task: "Set up a Fly.io deploy for the demo", doing: "writing <code>fly.toml</code>", files: ["fly.toml"] }],
+           terminals: [], commits: [] });
+         log(s, "noor", "<b>Noor's Claude</b> started a session on <b>chore/deploy</b>: new card from the first prompt"); return 20; },
+  s => { const c = card(s, 15); c.ahead = 7; c.commits.push("plain ws instead of socket.io", "reconnect with backoff");
+         c.pr = { n: 13, ci: "run", reviews: "no reviews yet" }; c.agents[0].state = "idle"; c.agents[0].doing = "opened PR #13";
+         c.local = { checks: CHECKS(), ago: "just now", unpushed: 0 };
+         log(s, "sam", "<b>Sam's Claude</b>: local CI passed, pushed and opened <b>PR #13</b>"); return 15; },
+  s => { const c = card(s, 15); c.pr.ci = "pass";
+         log(s, "sam", "<b>PR #13</b>: CI passed. Ready to hook up the scoreboard"); return 15; },
+  s => { const c = card(s, 19); c.suggested = null; c.owner = "andor"; c.branch = "feat/rate-limit"; c.ahead = 0; c.fromClaude = true;
+         c.agents = [{ id: "a2", state: "working", task: "Rate-limit POST /scores per team", doing: "reading <code>src/api/scores.ts</code>", files: [] }];
+         c.terminals = []; c.commits = [];
+         log(s, "andor", "<b>Andor</b> picked up <b>Rate-limit POST /scores</b>; a second Claude started in a worktree"); return 19; },
+];
+
+// ---------- state helpers ----------
+let state = initialState();
+let step = 0;
+let openCardId = null;
+function card(s, id) { return s.cards.find(c => c.id === id); }
+function agent(s, cardId, agentId) { return card(s, cardId).agents.find(a => a.id === agentId); }
+function addFile(a, f) { if (!a.files.includes(f)) a.files.unshift(f); }
+function log(s, who, text) { s.events.push({ t: 0, who, text, fresh: true }); }
+function fmtClock(m) { return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; }
+const esc = t => t.replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+
+// ---------- render ----------
+const $ = id => document.getElementById(id);
+const branchIcon = `<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm0 2.122a2.25 2.25 0 1 0-1.5 0v5.256a2.25 2.25 0 1 0 1.5 0V9.5a1 1 0 0 1 1-1h3.5A2.5 2.5 0 0 0 12 6V5.372a2.25 2.25 0 1 0-1.5 0V6a1 1 0 0 1-1 1H6c-.35 0-.687.06-1 .17V5.372ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm7-8.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"/></svg>`;
+const prIcon = `<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/></svg>`;
+
+function avatar(who, cls = "") {
+  if (!who) return `<span class="avatar none ${cls}" title="Nobody yet">?</span>`;
+  const p = PEOPLE[who];
+  return `<span class="avatar ${cls}" style="background:${p.color}" title="${p.name}">${p.name[0]}</span>`;
+}
+function ciBadge(pr) {
+  if (pr.merged) return `<span class="badge plain">${prIcon} #${pr.n} merged</span>`;
+  const label = { pass: "CI passed", fail: `CI failed${pr.ciNote ? ": " + pr.ciNote : ""}`, run: "CI running" }[pr.ci];
+  return `<span class="badge plain">${prIcon} #${pr.n}</span><span class="badge ${pr.ci}">${label}</span>`;
+}
+const failedCheck = l => l.checks.find(c => c.state === "fail");
+function localBadge(l, col) {
+  if (!l || col === "shipped") return "";
+  if (failedCheck(l)) return `<span class="badge fail" title="Local CI ${l.ago}">local ✗ ${failedCheck(l).name} · push held</span>`;
+  return `<span class="badge pass" title="Local CI ${l.ago}">local ✓${l.unpushed ? " · ready to push" : ""}</span>`;
+}
+function agentsOf(who) { return state.cards.filter(c => c.owner === who).flatMap(c => (c.agents || []).map(a => ({ ...a, card: c }))); }
+function currentBranch(who) {
+  const ags = agentsOf(who);
+  const live = ags.find(a => a.state === "working") || ags.find(a => a.state === "waiting") || ags[0];
+  return live?.card.branch || "main";
+}
+
+function renderTeam() {
+  $("team").innerHTML = Object.entries(PEOPLE).map(([id, p]) => {
+    const dots = agentsOf(id).map(a => `<span class="dot ${a.state}" title="${a.state}: ${esc(a.task)}"></span>`).join("");
+    const cls = state.filter ? (state.filter === id ? "on" : "dim") : "";
+    return `<button class="person ${cls}" data-person="${id}" type="button">
+      ${avatar(id)}
+      <span class="who"><span class="name">${p.name}</span><span class="branch">${currentBranch(id)}</span></span>
+      <span class="dots">${dots || `<span class="muted" style="font-size:11px">no agents</span>`}</span>
+    </button>`;
+  }).join("");
+}
+
+function renderCard(c) {
+  const col = columnOf(c);
+  const dim = state.filter && c.owner !== state.filter ? "dim" : "";
+  const flash = state.flash === c.id ? "flash" : "";
+  if (c.suggested) {
+    return `<div class="card suggested ${dim}" data-id="${c.id}">
+      <div class="card-top"><span class="card-title">${esc(c.title)}</span></div>
+      <div class="card-foot"><span class="badge ai">✦ suggested</span><span class="muted" style="font-size:11.5px">${esc(c.suggested)}</span></div>
+      <div class="card-foot"><button class="add-btn" type="button" data-add="${c.id}">Add to board</button></div>
+    </div>`;
+  }
+  const agents = (c.agents || []).filter(a => col !== "shipped").map(a =>
+    `<div class="agent-line ${a.state}"><span class="dot ${a.state}"></span><span class="what">Claude · ${a.doing}</span></div>`).join("");
+  const terms = localBadge(c.local, col);
+  const running = (c.terminals || []).filter(t => t.state === "run").map(t => `<span class="badge plain">▶ ${esc(t.cmd)}</span>`).join("");
+  return `<button class="card ${col} ${dim} ${flash}" data-id="${c.id}" type="button">
+    <div class="card-top"><span class="card-title">${esc(c.title)}</span><span class="card-id">#${c.id}</span></div>
+    ${c.branch ? `<div class="row"><span class="chip">${branchIcon}${esc(c.branch)}${c.ahead && col !== "shipped" ? ` <span class="ahead">↑${c.ahead}</span>` : ""}</span></div>` : ""}
+    ${agents}
+    ${c.pr || terms || running ? `<div class="row">${c.pr ? ciBadge(c.pr) : ""}${terms}${running}</div>` : ""}
+    <div class="card-foot">${c.fromClaude && col !== "shipped" ? `<span class="badge ai">✦ from a Claude session</span>` : ""}${c.pr?.reviews && !c.pr.merged ? `<span class="muted" style="font-size:11.5px">${c.pr.reviews}</span>` : ""}${avatar(c.owner, "sm")}</div>
+  </button>`;
+}
+
+function renderBoard() {
+  // FLIP: remember where each card was, so a card that changes column glides there
+  const before = new Map([...document.querySelectorAll("[data-id]")].map(el => [el.dataset.id, el.getBoundingClientRect()]));
+  $("board").innerHTML = COLUMNS.map(col => {
+    const cards = state.cards.filter(c => columnOf(c) === col.id);
+    return `<section class="col">
+      <div class="col-head"><h2>${col.title}</h2><span class="count">${cards.length}</span></div>
+      <div class="col-rule">${col.rule}</div>
+      <div class="cards">${cards.map(renderCard).join("")}${col.id === "next" ? `<button class="new-card" type="button">+ New card</button>` : ""}</div>
+    </section>`;
+  }).join("");
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.querySelectorAll("#board [data-id]").forEach(el => {
+    const old = before.get(el.dataset.id);
+    if (!old) return;
+    const now = el.getBoundingClientRect();
+    const dx = old.left - now.left, dy = old.top - now.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: 450, easing: "cubic-bezier(.2,.8,.2,1)" });
+  });
+}
+
+function renderFeed() {
+  $("events").innerHTML = [...state.events].reverse().map(e => {
+    const ago = state.clock - (e.at ?? state.clock + e.t);
+    return `<li class="event ${e.fresh ? "new" : ""}">${avatar(e.who, "sm")}<span class="txt">${e.text}</span><time>${ago <= 0 ? "now" : ago + "m"}</time></li>`;
+  }).join("");
+  state.events.forEach(e => { e.fresh = false; });
+  const working = state.cards.flatMap(c => c.agents || []).filter(a => a.state === "working").length;
+  const waiting = state.cards.flatMap(c => c.agents || []).filter(a => a.state === "waiting").length;
+  const review = state.cards.filter(c => columnOf(c) === "review");
+  const red = review.filter(c => c.pr.ci === "fail").length;
+  const held = state.cards.filter(c => c.local && failedCheck(c.local) && columnOf(c) !== "shipped").length;
+  $("catchup").innerHTML = `<b>${working} agents working</b>${waiting ? `, ${waiting} waiting for their human` : ""}. ` +
+    `${review.length} PRs in review${red ? `, ${red} with red CI` : ", all green"}. ` +
+    (held ? `${held} push held by local CI.` : "Local CI green everywhere.");
+}
+
+function render() { renderTeam(); renderBoard(); renderFeed(); if (openCardId) renderDrawer(openCardId); }
+
+// ---------- drawer ----------
+function contextFor(c) {
+  const lines = [`<span class="p">## Team board</span> (Margin Team, what every Claude on the team sees)`];
+  lines.push(`#${c.id} ${c.title}`);
+  lines.push(`  owner: ${c.owner ? PEOPLE[c.owner].name : "nobody"}${c.branch ? `, branch ${c.branch}` : ""}, column: ${COLUMNS.find(x => x.id === columnOf(c)).title}`);
+  (c.agents || []).forEach(a => lines.push(`  claude (${a.state}): ${a.task}; now ${a.doing.replace(/<[^>]+>/g, "")}`));
+  if (c.agents?.length && c.agents.some(a => a.files.length)) lines.push(`  files: ${[...new Set(c.agents.flatMap(a => a.files))].join(", ")}`);
+  if (c.local) lines.push(`  local ci: ${failedCheck(c.local) ? `failed on ${failedCheck(c.local).name}, push held` : "passed"} (${c.local.ago})`);
+  if (c.pr) lines.push(`  pr: #${c.pr.n} ${c.pr.merged ? "merged" : `ci ${c.pr.ci}, ${c.pr.reviews}`}`);
+  return lines.join("\n");
+}
+function renderDrawer(id) {
+  const c = card(state, id);
+  if (!c) return;
+  const col = columnOf(c);
+  $("drawer").innerHTML = `<div class="drawer-inner">
+    <div class="d-head"><h3>${esc(c.title)}</h3><button class="icon-btn" id="closeDrawer" type="button" aria-label="Close">✕</button></div>
+    <div class="row">
+      ${avatar(c.owner)} <span>${c.owner ? PEOPLE[c.owner].name : "Nobody yet"}</span>
+      <span class="muted">·</span><span class="badge plain">${COLUMNS.find(x => x.id === col).title}</span>
+      ${c.fromClaude ? `<span class="badge ai">✦ from a Claude session</span>` : ""}
+    </div>
+    ${c.branch ? `<div><h4>Branch</h4><div class="row"><span class="chip">${branchIcon}${esc(c.branch)}</span>${c.ahead ? `<span class="muted">${c.ahead} commits ahead of main</span>` : ""}</div>
+      ${c.commits?.length ? `<ul class="list" style="margin-top:10px">${[...c.commits].reverse().slice(0, 4).map(m => `<li><span class="muted mono">●</span>${esc(m)}</li>`).join("")}</ul>` : ""}</div>` : ""}
+    ${c.agents?.length ? `<div><h4>Agents</h4><div class="kv">${c.agents.map(a => `<div class="agent-box">
+        <div class="top"><span class="dot ${a.state}"></span><b style="font-weight:500">Claude</b><span class="muted mono">${a.id}</span><span class="state">${{ working: "working", waiting: "waiting for " + PEOPLE[c.owner].name, idle: "idle" }[a.state]}</span></div>
+        <div class="task">${esc(a.task)}</div>
+        <div class="task">Now: ${a.doing}</div>
+        ${a.files.length ? `<div class="files">${a.files.map(f => `<span class="chip">${esc(f)}</span>`).join("")}</div>` : ""}
+      </div>`).join("")}</div></div>` : ""}
+    ${c.local ? `<div><h4>Local CI</h4><ul class="list">${c.local.checks.map(k => `<li><span class="mono">pnpm ${k.name}</span><span class="right badge ${{ pass: "pass", fail: "fail", skip: "plain" }[k.state]}">${{ pass: "passed", fail: "failed" + (c.local.note ? ": " + c.local.note : ""), skip: "not run" }[k.state]}</span></li>`).join("")}</ul>
+      <p class="note">The same checks as GitHub CI (from <span class="mono">.github/workflows/ci.yml</span>), run ${c.local.ago} on ${PEOPLE[c.owner].name}'s laptop. ${failedCheck(c.local) ? "The push waits until they pass." : c.local.unpushed ? `${c.local.unpushed} commit${c.local.unpushed > 1 ? "s" : ""} ready to push.` : "Everything is pushed."}</p></div>` : ""}
+    ${c.terminals?.length ? `<div><h4>Terminals</h4><ul class="list">${c.terminals.map(t => `<li><span class="mono">$ ${esc(t.cmd)}</span><span class="right badge ${t.state === "run" ? "plain" : t.state}">${t.note}</span></li>`).join("")}</ul>
+      <p class="note">Only the command and the result are shared, never the output.</p></div>` : ""}
+    ${c.pr ? `<div><h4>Pull request</h4><div class="row">${ciBadge(c.pr)}${c.pr.reviews && !c.pr.merged ? `<span class="muted">${c.pr.reviews}</span>` : ""}</div></div>` : ""}
+    <div><h4>What Claude sees</h4><pre class="context">${contextFor(c)}</pre>
+      <p class="note">Every teammate's Claude gets this through <span class="mono">team_status</span> and <span class="mono">get_card</span>. No prompts, no transcripts, no terminal output.</p></div>
+  </div>`;
+  $("closeDrawer").onclick = closeDrawer;
+}
+function openDrawer(id) { openCardId = id; renderDrawer(id); $("drawer").classList.add("open"); $("scrim").classList.add("open"); }
+function closeDrawer() { openCardId = null; $("drawer").classList.remove("open"); $("scrim").classList.remove("open"); }
+
+// ---------- ask the board (canned answers from the board's own data) ----------
+function answerFor(q) {
+  q = q.toLowerCase();
+  const name = w => PEOPLE[w].name;
+  const cards = state.cards;
+  if (/auth|login|sign/.test(q)) {
+    const c = card(state, 14), a = c.agents[0];
+    return `<b>Zeb</b> owns auth, on <b>feat/login</b> (${c.ahead} commits, no PR yet). Zeb's Claude is ${a.state}: ${a.doing.replace(/<[^>]+>/g, "")}.\nIt has touched ${a.files.join(", ")}.<span class="src">from card #14, the git branch and Zeb's Claude session</span>`;
+  }
+  if (/block|demo|left|risk/.test(q)) {
+    const out = [];
+    cards.filter(c => c.pr && !c.pr.merged).forEach(c => out.push(`<b>PR #${c.pr.n}</b> ${c.title}: ${c.pr.ci === "pass" ? "green, " + c.pr.reviews + (c.pr.reviews === "approved" ? ", ready to merge" : "") : "CI " + (c.pr.ci === "fail" ? "failing" : "running")}`));
+    cards.flatMap(c => (c.agents || []).filter(a => a.state === "waiting").map(a => ({ a, c }))).forEach(({ a, c }) => out.push(`<b>${name(c.owner)}'s Claude</b> is waiting for an answer on #${c.id}: ${a.doing.replace(/<[^>]+>/g, "")}`));
+    cards.filter(c => c.local && failedCheck(c.local) && columnOf(c) !== "shipped").forEach(c => out.push(`<b>${c.branch}</b>: local CI fails on ${failedCheck(c.local).name}, so its push is held`));
+    const open = cards.filter(c => columnOf(c) === "next" && !c.suggested).length;
+    out.push(`${open} cards nobody has started yet`);
+    return out.map(l => "· " + l).join("\n") + `<span class="src">from pull requests, GitHub CI, local CI and agent states</span>`;
+  }
+  if (/hour|catch|happen|summar|miss/.test(q)) {
+    const recent = state.events.slice(-6).map(e => "· " + e.text).join("\n");
+    return recent + `<span class="src">the last ${Math.min(6, state.events.length)} events of the activity feed</span>`;
+  }
+  const lines = Object.keys(PEOPLE).map(w => {
+    const ags = agentsOf(w).filter(a => columnOf(a.card) !== "shipped");
+    if (!ags.length) return `<b>${name(w)}</b> on ${currentBranch(w)}, no agents running`;
+    return `<b>${name(w)}</b> on ${currentBranch(w)}: ` + ags.map(a => `Claude ${a.state} on “${a.card.title}”`).join("; ");
+  });
+  return lines.join("\n") + `<span class="src">from every teammate's branch and Claude sessions</span>`;
+}
+let typing = null;
+function ask(q) {
+  $("askInput").value = q;
+  const html = answerFor(q);
+  const el = $("answer");
+  clearInterval(typing);
+  // type the plain text, then swap in the formatted answer
+  const plain = html.replace(/<span class="src">.*$/s, "").replace(/<[^>]+>/g, "");
+  let i = 0;
+  el.textContent = "";
+  typing = setInterval(() => {
+    i += 3;
+    el.textContent = plain.slice(0, i);
+    if (i >= plain.length) { clearInterval(typing); el.innerHTML = html; }
+  }, 12);
+}
+function openAsk() { $("palette").classList.add("open"); $("askScrim").classList.add("open"); setTimeout(() => $("askInput").focus(), 30); }
+function closeAsk() { $("palette").classList.remove("open"); $("askScrim").classList.remove("open"); }
+
+// ---------- events ----------
+document.addEventListener("click", e => {
+  const person = e.target.closest("[data-person]");
+  if (person) { state.filter = state.filter === person.dataset.person ? null : person.dataset.person; render(); return; }
+  const add = e.target.closest("[data-add]");
+  if (add) {
+    const c = card(state, +add.dataset.add);
+    c.suggested = null;
+    log(state, "andor", `<b>Andor</b> added <b>${esc(c.title)}</b> from a suggestion`);
+    state.flash = c.id; render(); return;
+  }
+  const cardEl = e.target.closest("#board .card");
+  if (cardEl) openDrawer(+cardEl.dataset.id);
+});
+$("scrim").onclick = closeDrawer;
+$("askBtn").onclick = openAsk;
+$("askScrim").onclick = closeAsk;
+$("suggest").onclick = e => { if (e.target.matches("button")) ask(e.target.textContent); };
+$("askForm").onsubmit = e => { e.preventDefault(); if ($("askInput").value.trim()) ask($("askInput").value); };
+document.addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openAsk(); }
+  if (e.key === "Escape") { closeAsk(); closeDrawer(); }
+});
+$("replay").onclick = () => { state = initialState(); step = 0; stampEvents(); render(); };
+
+
+// countdown to the demo
+let secs = 5 * 3600 + 42 * 60 + 10;
+setInterval(() => {
+  secs = Math.max(0, secs - 1);
+  const h = Math.floor(secs / 3600), m = Math.floor(secs / 60) % 60, s = secs % 60;
+  $("countdown").textContent = [h, m, s].map(n => String(n).padStart(2, "0")).join(":");
+}, 1000);
+
+// the simulation: each step is a minute later on the hackathon clock
+function stampEvents() { state.events.forEach(e => { e.at ??= state.clock + e.t; }); }
+stampEvents();
+setInterval(() => {
+  if (step >= SCRIPT.length) return;
+  state.clock += 1;
+  state.flash = SCRIPT[step++](state);
+  stampEvents();
+  render();
+  setTimeout(() => { state.flash = null; document.querySelectorAll(".card.flash").forEach(el => el.classList.remove("flash")); }, 1400);
+}, 4000);
+
+render();
+</script>
+<script src="shared.js"></script>
+</body>
+</html>

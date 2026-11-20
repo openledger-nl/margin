@@ -1,0 +1,457 @@
+sh<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>In VS Code · Margin Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.page { max-width: 1320px; }
+.intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+.hint { font-size: 13px; color: var(--ink-3); }
+
+/* the window: always VS Code dark, whatever the page theme */
+.frame-wrap { margin-top: 32px; overflow-x: auto; border-radius: 12px; box-shadow: var(--shadow-lg); }
+.win {
+  --vs-bg: #1F1F1F; --vs-side: #181818; --vs-line: #2B2B2B; --vs-ink: #CCCCCC; --vs-dim: #8B8B8B;
+  --vs-accent: #0078D4; --vs-sel: #04395E; --vs-hover: #2A2D2E;
+  min-width: 1100px; height: 960px; background: var(--vs-bg); color: var(--vs-ink); font: 13px/1.4 var(--sans);
+  display: grid; grid-template-rows: 35px 1fr 22px; border: 1px solid var(--vs-line); border-radius: 12px; overflow: hidden;
+  position: relative;
+}
+.win .mono { font-family: var(--mono); }
+.titlebar {
+  background: var(--vs-side); border-bottom: 1px solid var(--vs-line); display: grid;
+  grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 10px; font-size: 12px; color: var(--vs-dim);
+}
+.titlebar .menu { display: flex; gap: 14px; }
+.cmd-center {
+  background: #2A2A2A; border: 1px solid #3C3C3C; border-radius: 6px; padding: 3px 80px; font-size: 12px; color: var(--vs-dim);
+}
+.titlebar .wc { justify-self: end; display: flex; gap: 16px; }
+
+.body { display: grid; grid-template-columns: 48px 290px minmax(0, 1fr); min-height: 0; }
+.actbar { background: var(--vs-side); border-right: 1px solid var(--vs-line); display: flex; flex-direction: column; align-items: center; padding-top: 4px; }
+.act { width: 48px; height: 48px; display: grid; place-items: center; color: #868686; position: relative; }
+.act.on { color: #fff; }
+.act.on::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: #fff; }
+.act .bdg {
+  position: absolute; right: 8px; bottom: 9px; background: var(--vs-accent); color: #fff; font-size: 9px; font-weight: 600;
+  min-width: 16px; height: 16px; border-radius: 8px; display: grid; place-items: center; padding: 0 4px;
+}
+.act .bdg.green { background: #2F9E6B; }
+
+/* side bar: the Margin Team view */
+.side { background: var(--vs-side); border-right: 1px solid var(--vs-line); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.side-title { height: 35px; display: flex; align-items: center; padding: 0 12px 0 20px; font-size: 11px; letter-spacing: .04em; }
+.side-title .acts { margin-left: auto; display: flex; gap: 10px; color: var(--vs-dim); }
+.team-meta { padding: 0 20px 10px; font-size: 12px; color: var(--vs-dim); display: flex; align-items: center; gap: 6px; }
+.team-meta .codey { font-family: var(--mono); color: #4CC38A; }
+.sec { border-top: 1px solid var(--vs-line); }
+.sec-head {
+  height: 22px; display: flex; align-items: center; gap: 4px; padding: 0 8px; font-size: 11px; font-weight: 600;
+  letter-spacing: .03em; cursor: pointer; user-select: none; width: 100%; text-align: left;
+}
+.sec-head .tw { width: 16px; display: inline-grid; place-items: center; transition: transform .15s; }
+.sec.closed .tw { transform: rotate(-90deg); }
+.sec.closed .sec-body { display: none; }
+.sec-body { padding: 2px 0 8px; }
+.tree-row {
+  display: flex; align-items: center; gap: 7px; height: 24px; padding-right: 12px; font-size: 13px; white-space: nowrap;
+  cursor: pointer; width: 100%; text-align: left;
+}
+.tree-row:hover { background: var(--vs-hover); }
+.tree-row.sel { background: var(--vs-sel); outline: 1px solid var(--vs-accent); outline-offset: -1px; }
+.tree-row .tw { width: 16px; flex-shrink: 0; display: inline-grid; place-items: center; color: var(--vs-dim); transition: transform .15s; }
+.tree-row.closed .tw { transform: rotate(-90deg); }
+.tree-row .desc { color: var(--vs-dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+.tree-row .end { margin-left: auto; color: var(--vs-dim); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.tree-row .branch { font-family: var(--mono); font-size: 11.5px; color: var(--vs-dim); }
+.l1 { padding-left: 8px; } .l2 { padding-left: 32px; }
+.av { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; font-weight: 600; color: #fff; flex-shrink: 0; }
+.vdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; position: relative; }
+.vdot.working { background: #4CC38A; }
+.vdot.working::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid #4CC38A; opacity: 0; animation: pulse 1.8s ease-out infinite; }
+.vdot.waiting { background: #E0A93B; }
+.vdot.idle { border: 1.5px solid var(--vs-dim); }
+.st-pass { color: #4CC38A; } .st-fail { color: #F14C4C; } .st-run { color: #E0A93B; }
+.side-foot { margin-top: auto; padding: 12px 20px 14px; border-top: 1px solid var(--vs-line); }
+.side-foot button { width: 100%; background: var(--vs-accent); color: #fff; border-radius: 3px; padding: 5px; font-size: 13px; }
+.side-foot button:hover { background: #026EC1; }
+
+/* editor + panel */
+.main { display: grid; grid-template-rows: minmax(0, 1fr) 400px; min-width: 0; min-height: 0; }
+.editor { display: grid; grid-template-rows: 35px minmax(0, 1fr); min-height: 0; border-bottom: 1px solid var(--vs-line); }
+.tabs { display: flex; background: var(--vs-side); border-bottom: 1px solid var(--vs-line); }
+.tab {
+  display: flex; align-items: center; gap: 7px; padding: 0 14px; font-size: 13px; color: var(--vs-dim);
+  border-right: 1px solid var(--vs-line); height: 35px;
+}
+.tab.on { background: var(--vs-bg); color: #fff; box-shadow: inset 0 1px 0 var(--vs-accent); }
+.tab .x { color: transparent; font-size: 11px; } .tab.on .x { color: var(--vs-dim); }
+.tab .tsx { color: #4EC9B0; font-size: 11px; font-weight: 600; }
+.view { min-height: 0; position: relative; overflow: auto; }
+.view[hidden] { display: none; }
+.crumbs { height: 22px; display: flex; align-items: center; padding: 0 16px; font-size: 12px; color: var(--vs-dim); gap: 4px; }
+.code { font: 13px/20px var(--mono); padding-bottom: 20px; }
+.ln { display: grid; grid-template-columns: 60px 3px minmax(0, 1fr); }
+.ln .n { text-align: right; padding-right: 14px; color: #6E7681; }
+.ln .g { background: transparent; }
+.ln .g.add { background: #2EA043; } .ln .g.mod { background: #0078D4; }
+.ln .t { white-space: pre; padding-left: 18px; }
+.ln.cur { background: #282828; } .ln.cur .n { color: #CCCCCC; }
+.lens { display: grid; grid-template-columns: 63px minmax(0, 1fr); font: 12px/18px var(--sans); color: #999; }
+.lens span { padding-left: 18px; cursor: pointer; }
+.lens span:hover { color: #3794FF; text-decoration: underline; }
+.lens .spark { color: #4CC38A; }
+.tk-kw { color: #C586C0; } .tk-dec { color: #569CD6; } .tk-str { color: #CE9178; } .tk-fn { color: #DCDCAA; }
+.tk-comp { color: #4EC9B0; } .tk-tag { color: #569CD6; } .tk-attr { color: #9CDCFE; } .tk-var { color: #9CDCFE; } .tk-num { color: #B5CEA8; }
+
+.hover {
+  position: absolute; left: 440px; top: 106px; width: 360px; background: #252526; border: 1px solid #454545;
+  border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,.5); font-size: 13px; z-index: 3;
+}
+.hover[hidden] { display: none; }
+.hover .h-body { padding: 10px 12px; display: grid; gap: 7px; }
+.hover .h-title { font-weight: 600; color: #fff; display: flex; gap: 8px; align-items: center; }
+.hover .h-title .id { color: var(--vs-dim); font-weight: 400; font-family: var(--mono); font-size: 12px; margin-left: auto; }
+.hover .h-row { display: flex; gap: 8px; align-items: center; color: var(--vs-ink); font-size: 12.5px; flex-wrap: wrap; }
+.hover .chipv { font-family: var(--mono); font-size: 11.5px; background: #333; padding: 1px 6px; border-radius: 3px; }
+.hover .h-foot { border-top: 1px solid #454545; padding: 6px 12px; display: flex; gap: 14px; font-size: 12px; }
+.hover .h-foot a { color: #3794FF; text-decoration: none; cursor: pointer; }
+.board-frame { width: 100%; height: 100%; border: 0; display: block; background: #1F1F1F; }
+
+/* terminal panel */
+.panel { display: grid; grid-template-rows: 35px minmax(0, 1fr); min-height: 0; }
+.panel-tabs { display: flex; align-items: center; gap: 22px; padding: 0 20px; font-size: 11px; letter-spacing: .03em; color: var(--vs-dim); }
+.panel-tabs .on { color: #fff; box-shadow: inset 0 -1px 0 #fff; padding: 10px 0 9px; }
+.panel-body { display: grid; grid-template-columns: minmax(0, 1fr) 200px; min-height: 0; }
+.term { font: 12.5px/19px var(--mono); padding: 4px 20px 10px; overflow-y: auto; white-space: pre-wrap; color: #CCCCCC; }
+.term .dim { color: #7A7A7A; } .term .grn { color: #4CC38A; } .term .blu { color: #3794FF; } .term .amb { color: #E0A93B; }
+.term .prompt { color: #fff; background: #2A2A2A; display: block; padding: 2px 8px; margin: 4px 0 8px; border-radius: 3px; }
+.term .line { opacity: 0; transition: opacity .25s; } .term .line.in { opacity: 1; }
+.term .boxed { display: block; border: 1px solid #3C3C3C; border-radius: 6px; padding: 4px 10px; margin-top: 8px; color: var(--vs-dim); }
+.terms { border-left: 1px solid var(--vs-line); padding: 4px 0; font-size: 12.5px; }
+.terms button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 3px 12px; text-align: left; color: var(--vs-ink); }
+.terms button:hover { background: var(--vs-hover); }
+.terms button.on { background: #37373D; }
+.terms .sub { color: var(--vs-dim); font-size: 11.5px; margin-left: auto; }
+
+.statusbar { background: #181818; border-top: 1px solid var(--vs-line); display: flex; align-items: center; font-size: 12px; color: var(--vs-ink); }
+.statusbar .item { padding: 0 9px; height: 22px; display: flex; align-items: center; gap: 5px; }
+.statusbar .remote { background: var(--vs-accent); color: #fff; padding: 0 12px; }
+.statusbar .margin { background: #2F9E6B; color: #fff; margin-left: auto; }
+.statusbar .spark { font-size: 11px; }
+
+/* numbered markers + legend */
+.mk {
+  position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #F4F1EA; color: #0E1016;
+  font: 600 12px/22px var(--sans); text-align: center; z-index: 5; box-shadow: 0 0 0 3px #2F9E6B;
+}
+.legend { list-style: none; margin: 28px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.legend li { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); }
+.legend .num {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--green);
+  color: #fff; font-size: 12px; font-weight: 600; margin-right: 8px;
+}
+.legend h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; display: flex; align-items: center; }
+.legend p { margin: 0; font-size: 13px; }
+@media (max-width: 900px) { .legend { grid-template-columns: 1fr; } }
+@keyframes pulse { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(1.6); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .vdot.working::after { animation: none; } .term .line { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="index.html">
+    <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#F4F1EA"/><path d="M64 448L64 64L176 64L256 212L336 64L448 64L448 448L336 448L336 236L256 372L176 236L176 448Z" fill="#2F9E6B"/><rect x="82" y="82" width="76" height="236" fill="#0E1016"/><path d="M96 104L124 124L96 144L96 133L109 124L96 115Z" fill="#4CC38A"/><rect x="130" y="135" width="20" height="9" fill="#4CC38A"/><rect x="98" y="164" width="48" height="9" fill="#B4BACB"/><rect x="98" y="186" width="32" height="9" fill="#B4BACB"/></svg>
+    <span>Margin Team</span>
+  </a>
+  <nav class="pages" aria-label="Pages"><a href="index.html">Board</a><a href="start.html">Get started</a><a href="vscode.html" aria-current="page">In VS Code</a></nav>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch light and dark">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
+  </button>
+</header>
+
+<main class="page">
+  <div class="intro">
+    <div>
+      <p class="eyebrow">In VS Code · planned, not built yet</p>
+      <h1>The team, right next to your code</h1>
+      <p class="lede">Andor is building the team page. Without asking anyone, Andor and Andor's Claude can see that Sam's live scores are in a green PR, what Zeb's agents are doing, and who is waiting for an answer. And nothing gets pushed before local CI passes.</p>
+    </div>
+    <p class="hint">Click around: the tree, the tabs, the CodeLens, the terminals on the right.</p>
+  </div>
+
+  <div class="frame-wrap">
+    <div class="win" id="win">
+      <div class="titlebar">
+        <div class="menu"><span>File</span><span>Edit</span><span>Selection</span><span>View</span><span>Go</span><span>Terminal</span></div>
+        <div class="cmd-center">scoreboard</div>
+        <div class="wc"><span>—</span><span>☐</span><span>✕</span></div>
+      </div>
+
+      <div class="body">
+        <nav class="actbar" aria-label="Activity bar">
+          <div class="act" title="Explorer"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></div>
+          <div class="act" title="Search"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg></div>
+          <div class="act" title="Source Control"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7v10M18 10c0 4-6 3-11 7"/></svg><span class="bdg">2</span></div>
+          <div class="act" title="Extensions"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="4" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/><rect x="14" y="2.5" width="7" height="7" transform="rotate(12 17.5 6)"/></svg></div>
+          <div class="act on" title="Margin Team"><svg width="22" height="22" viewBox="0 0 512 512" fill="currentColor"><path d="M64 448L64 64L176 64L256 212L336 64L448 64L448 448L336 448L336 236L256 372L176 236L176 448Z"/></svg><span class="bdg green">3</span></div>
+        </nav>
+
+        <aside class="side">
+          <div class="side-title">MARGIN TEAM<span class="acts"><span title="Ask the board">✦</span><span title="Refresh">↻</span><span>⋯</span></span></div>
+          <div class="team-meta"><span class="codey">Harbour Hack</span> · 4 people · via Tailscale</div>
+
+          <div class="sec" id="secTeam">
+            <button class="sec-head" type="button"><span class="tw">▾</span>TEAM</button>
+            <div class="sec-body" id="teamTree"></div>
+          </div>
+          <div class="sec">
+            <button class="sec-head" type="button"><span class="tw">▾</span>MY CARDS</button>
+            <div class="sec-body">
+              <div class="tree-row l1"><span class="tw"></span><span class="vdot working"></span><span>Team page with members</span><span class="end">#16</span></div>
+              <div class="tree-row l1"><span class="tw"></span><span class="vdot working"></span><span>Rate-limit POST /scores</span><span class="end">#19</span></div>
+            </div>
+          </div>
+          <div class="sec">
+            <button class="sec-head" type="button"><span class="tw">▾</span>PULL REQUESTS</button>
+            <div class="sec-body">
+              <div class="tree-row l1"><span class="tw"></span><span class="st-pass">✓</span><span>#13 Live scoreboard</span><span class="end"><span class="av" style="background:#B97A12">S</span></span></div>
+              <div class="tree-row l1"><span class="tw"></span><span class="st-run">●</span><span>#12 Navbar on mobile</span><span class="desc">CI running</span><span class="end"><span class="av" style="background:#3D6FD6">Z</span></span></div>
+              <div class="tree-row l1"><span class="tw"></span><span style="color:#A371F7">⮌</span><span>#11 Seed script</span><span class="desc">merged</span><span class="end"><span class="av" style="background:#9B5BC4">N</span></span></div>
+            </div>
+          </div>
+          <div class="side-foot"><button type="button" id="openBoard">Open board</button></div>
+        </aside>
+
+        <div class="main">
+          <section class="editor">
+            <div class="tabs">
+              <button class="tab on" type="button" data-view="code"><span class="tsx">TSX</span>TeamPage.tsx<span class="x">✕</span></button>
+              <button class="tab" type="button" data-view="board"><svg width="13" height="13" viewBox="0 0 512 512" fill="#2F9E6B"><path d="M64 448L64 64L176 64L256 212L336 64L448 64L448 448L336 448L336 236L256 372L176 236L176 448Z"/></svg>Margin Board<span class="x">✕</span></button>
+            </div>
+            <div class="view" id="view-code">
+              <div class="crumbs">src › pages › <span style="color:#4EC9B0">TeamPage.tsx</span> › TeamPage</div>
+              <div class="code" id="code"></div>
+              <div class="hover" id="hover">
+                <div class="h-body">
+                  <div class="h-title"><span class="av" style="background:#B97A12">S</span>Live scoreboard over websockets<span class="id">#15</span></div>
+                  <div class="h-row"><span class="chipv">feat/api-scores</span><span style="color:var(--vs-dim)">Sam · 7 commits ahead</span></div>
+                  <div class="h-row"><span class="st-pass">✓</span> PR #13 · CI passed · not merged yet</div>
+                  <div class="h-row" style="color:var(--vs-dim)">Adds <span class="mono" style="color:#DCDCAA">useScores()</span> in src/api/socket.ts. Sam's Claude is idle.</div>
+                </div>
+                <div class="h-foot"><a>Open card</a><a>Open PR #13</a><a>Check out branch</a></div>
+              </div>
+            </div>
+            <div class="view" id="view-board" hidden>
+              <iframe class="board-frame" id="boardFrame" title="Margin board" loading="lazy"></iframe>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-tabs"><span>PROBLEMS</span><span>OUTPUT</span><span>DEBUG CONSOLE</span><span class="on">TERMINAL</span><span>PORTS</span></div>
+            <div class="panel-body">
+              <div class="term" id="term"></div>
+              <div class="terms" id="terms">
+                <button class="on" type="button" data-term="claude"><span class="vdot working"></span>claude<span class="sub">feat/team-page</span></button>
+                <button type="button" data-term="dev"><span class="st-run">▶</span>pnpm dev<span class="sub">running</span></button>
+                <button type="button" data-term="test"><span class="st-pass">✓</span>local CI<span class="sub">3/3 passed</span></button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="statusbar">
+        <span class="item remote">⌥</span>
+        <span class="item">⎇ feat/team-page ↑0</span>
+        <span class="item"><span class="st-pass">✓</span> local CI</span>
+        <span class="item">⊗ 0 ⚠ 0</span>
+        <span class="item margin" title="Margin Team: Harbour Hack, connected over Tailscale"><span class="spark">✦</span> Margin · 4 in team · 3 working · 1 waiting</span>
+        <span class="item">Ln 9, Col 37</span>
+        <span class="item">TypeScript JSX</span>
+      </footer>
+
+      <span class="mk" style="left:250px; top:98px">1</span>
+      <span class="mk" id="mk2" style="left:792px; top:150px">2</span>
+      <span class="mk" style="left:652px; top:41px">3</span>
+      <span class="mk" style="left:760px; top:545px">4</span>
+      <span class="mk" style="left:790px; bottom:0">5</span>
+      <span class="mk" style="right:150px; top:652px">6</span>
+    </div>
+  </div>
+
+  <ol class="legend">
+    <li><h3><span class="num">1</span>The Margin Team view</h3><p>Everyone's branch, every Claude session with its state and what it's doing now, your own cards and the team's pull requests. Expand a person to see their agents.</p></li>
+    <li><h3><span class="num">2</span>CodeLens where it matters</h3><p>When a line uses code another teammate is changing, a quiet CodeLens says so: <em>Sam's PR #13 adds useScores, CI passed</em>. Click it for the card. Information, not a warning.</p></li>
+    <li><h3><span class="num">3</span>The board as an editor tab</h3><p><em>Open board</em> shows the same live board as the big screen, in VS Code's colors. Click a card for its branch, agents, terminals and PR.</p></li>
+    <li><h3><span class="num">4</span>Your Claude knows the team</h3><p>The session starts with a short team snapshot, and Claude reads cards through the MCP server when it needs them. You say "Sam's live scores", it knows the branch, the PR and the function.</p></li>
+    <li><h3><span class="num">5</span>Status bar</h3><p>At a glance: how many teammates and agents are working, and whether someone's agent waits for its human. Click it to open the Margin Team view.</p></li>
+    <li><h3><span class="num">6</span>Local CI before every push</h3><p>When Claude pushes, the repo's CI checks run on your laptop first. A red check holds the push and Claude gets the failure to fix, so GitHub CI only confirms. The board shows <em>local ✓</em> or <em>push held</em>.</p></li>
+  </ol>
+</main>
+
+<script>
+// ---------- team tree ----------
+const TEAM = [
+  { name: "Zeb", color: "#3D6FD6", branch: "feat/login", open: true, agents: [
+    { state: "working", label: "Google sign-in", desc: "editing google.ts", cycle: ["editing google.ts", "editing LoginPage.tsx", "running pnpm test auth", "editing session.ts"] },
+    { state: "idle", label: "fix/navbar", desc: "done: lint fixed" } ] },
+  { name: "Sam", color: "#B97A12", branch: "feat/api-scores", open: true, agents: [
+    { state: "waiting", label: "Live scoreboard", desc: "asks: Socket.IO or ws?" } ] },
+  { name: "Noor", color: "#9B5BC4", branch: "chore/deploy", open: false, agents: [
+    { state: "working", label: "Deploy to Fly.io", desc: "writing fly.toml" } ] },
+  { name: "Andor", you: true, color: "#2F9E6B", branch: "feat/team-page", open: true, agents: [
+    { state: "working", label: "Team page", desc: "editing TeamPage.tsx" },
+    { state: "working", label: "Rate-limit", desc: "reading scores.ts" } ] },
+];
+function renderTeam() {
+  document.getElementById("teamTree").innerHTML = TEAM.map((p, i) => `
+    <button class="tree-row l1 ${p.open ? "" : "closed"}" type="button" data-person="${i}">
+      <span class="tw">▾</span><span class="av" style="background:${p.color}">${p.name[0]}</span>
+      <span>${p.name}${p.you ? ' <span class="desc">(you)</span>' : ""}</span>
+      <span class="branch">${p.branch}</span>
+      <span class="end">${p.agents.map(a => `<span class="vdot ${a.state}"></span>`).join("")}</span>
+    </button>
+    ${p.open ? p.agents.map(a => `
+      <div class="tree-row l2" title="${a.label}: ${a.desc}"><span class="vdot ${a.state}"></span><span>${a.label}</span><span class="desc">${a.desc}</span></div>`).join("") : ""}
+  `).join("");
+}
+renderTeam();
+let cycleStep = 0;
+setInterval(() => {
+  const a = TEAM[0].agents[0];
+  a.desc = a.cycle[++cycleStep % a.cycle.length];
+  renderTeam();
+}, 3500);
+
+// ---------- code with a tiny highlighter ----------
+const CODE = `import { useParams } from "react-router-dom";
+import { Avatar } from "../components/Avatar";
+import { useTeam } from "../api/teams";
+import { useScores } from "../api/socket";
+
+export function TeamPage() {
+  const { teamId } = useParams();
+  const team = useTeam(teamId);
+  const scores = useScores(teamId);
+
+  if (!team) return <Spinner />;
+
+  return (
+    <section className="team-page">
+      <h1>{team.name}</h1>
+      <p className="score">{scores.total} points</p>
+      <ul className="members">
+        {team.members.map((m) => (
+          <li key={m.id}>
+            <Avatar user={m} size={48} />
+            <span>{m.name}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}`;
+const esc = t => t.replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+function highlight(line) {
+  const re = /("[^"]*")|(<\/?)([A-Za-z][\w.]*)|\b(import|from|export|return|if)\b|\b(function|const)\b|\b(\d+)\b|\b([A-Za-z_]\w*)(?=\()|\b([a-zA-Z]+)(?==)|\b([a-z_]\w*)\b/g;
+  let out = "", last = 0;
+  for (const m of line.matchAll(re)) {
+    out += esc(line.slice(last, m.index));
+    if (m[1]) out += `<span class="tk-str">${esc(m[1])}</span>`;
+    else if (m[2]) out += esc(m[2]) + `<span class="${/^[A-Z]/.test(m[3]) ? "tk-comp" : "tk-tag"}">${m[3]}</span>`;
+    else if (m[4]) out += `<span class="tk-kw">${m[4]}</span>`;
+    else if (m[5]) out += `<span class="tk-dec">${m[5]}</span>`;
+    else if (m[6]) out += `<span class="tk-num">${m[6]}</span>`;
+    else if (m[7]) out += `<span class="tk-fn">${m[7]}</span>`;
+    else if (m[8]) out += `<span class="tk-attr">${m[8]}</span>`;
+    else if (m[9]) out += `<span class="tk-var">${m[9]}</span>`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(line.slice(last));
+}
+const GUTTER = { 4: "add", 9: "add", 16: "mod" };
+document.getElementById("code").innerHTML = CODE.split("\n").map((l, i) => {
+  const n = i + 1;
+  const lens = n === 4 ? `<div class="lens"><span></span><span id="lens"><span class="spark">✦</span> Sam's PR #13 adds useScores · CI passed · not merged yet</span></div>` : "";
+  return lens + `<div class="ln ${n === 9 ? "cur" : ""}"><span class="n">${n}</span><span class="g ${GUTTER[n] || ""}"></span><span class="t">${highlight(l) || " "}</span></div>`;
+}).join("");
+
+// ---------- tabs, tree, hover ----------
+const hover = document.getElementById("hover");
+function showView(v) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.view === v));
+  document.getElementById("view-code").hidden = v !== "code";
+  document.getElementById("view-board").hidden = v !== "board";
+  document.getElementById("mk2").hidden = v !== "code";
+  const f = document.getElementById("boardFrame");
+  if (v === "board" && !f.src) f.src = "index.html?embed";
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => showView(t.dataset.view)));
+document.getElementById("openBoard").onclick = () => showView("board");
+document.getElementById("win").addEventListener("click", e => {
+  const head = e.target.closest(".sec-head");
+  if (head) { head.parentElement.classList.toggle("closed"); return; }
+  const person = e.target.closest("[data-person]");
+  if (person) { const p = TEAM[+person.dataset.person]; p.open = !p.open; renderTeam(); return; }
+  if (e.target.closest("#lens")) { hover.hidden = !hover.hidden; return; }
+  if (!e.target.closest("#hover")) hover.hidden = true;
+});
+
+// ---------- terminals ----------
+const TERMS = {
+  claude: [
+    `<span class="dim">╭─ Claude Code ─ ~/code/scoreboard (feat/team-page)</span>`,
+    `<span class="dim">⎿ Margin Team: Zeb on feat/login (Claude working: Google sign-in) · Sam on feat/api-scores (PR #13, CI passed) · Noor on chore/deploy (Claude working)</span>`,
+    `<span class="prompt">&gt; hook the team page up to Sam's live scores</span>`,
+    `<span class="grn">⏺</span> <span class="blu">margin-team</span> - get_card <span class="dim">(MCP)</span> "live scores"`,
+    `  <span class="dim">⎿ #15 Live scoreboard over websockets · Sam · feat/api-scores</span>`,
+    `  <span class="dim">  PR #13 open, CI passed, not merged · adds useScores(teamId) in src/api/socket.ts</span>`,
+    ``,
+    `<span class="grn">⏺</span> Sam's live scores are in PR #13: green, not merged yet. I'll rebase on`,
+    `  feat/api-scores and use useScores(teamId). <span class="dim">Update(src/pages/TeamPage.tsx) ⎿ 3 additions</span>`,
+    `<span class="prompt">&gt; push it</span>`,
+    `<span class="grn">⏺</span> Bash(git push)`,
+    `  <span class="amb">⎿ Push held by Margin Team: local CI failed on "pnpm test"</span>`,
+    `  <span class="dim">  TeamPage.test.tsx › shows the score: expected "120 points", got "0 points"</span>`,
+    `<span class="grn">⏺</span> The test still uses a static score. I'll mock useScores in the test.`,
+    `  <span class="dim">Update(src/pages/TeamPage.test.tsx) ⎿ 4 additions, 1 removal</span>`,
+    `<span class="grn">⏺</span> Bash(git push)`,
+    `  <span class="grn">⎿ Local CI passed: typecheck ✓ test ✓ build ✓ (38s) · pushed feat/team-page</span>`,
+    `<span class="boxed">&gt; <span class="line in" style="opacity:.5">▌</span></span>`,
+  ],
+  dev: [`<span class="dim">$</span> pnpm dev`, ``, `  <span class="grn">VITE v7.1.2</span>  ready in 412 ms`, ``, `  ➜  Local:   <span class="blu">http://localhost:5173/</span>`, `  <span class="dim">14:21:07 [vite] hmr update /src/pages/TeamPage.tsx</span>`],
+  test: [`<span class="blu">Margin Team</span> · local CI before pushing feat/team-page`, `<span class="dim">checks from margin-team.json (same as .github/workflows/ci.yml)</span>`, ``,
+    ` <span class="amb">run 1</span>  <span class="grn">✓</span> pnpm typecheck  <span class="dim">4.1s</span>`, `        <span class="st-fail">✗</span> pnpm test       <span class="dim">TeamPage.test.tsx: 1 failing</span>`, `        <span class="dim">–</span> pnpm build      <span class="dim">skipped</span>   <span class="amb">push held</span>`, ``,
+    ` <span class="grn">run 2</span>  <span class="grn">✓</span> pnpm typecheck  <span class="dim">4.0s</span>`, `        <span class="grn">✓</span> pnpm test       <span class="dim">12.8s · 6 passed</span>`, `        <span class="grn">✓</span> pnpm build      <span class="dim">21.3s</span>       <span class="grn">pushed 9f3c2a1</span>`, ``,
+    `<span class="dim">Margin Team shares: "local CI ✓ 3/3". Never the output above.</span>`],
+};
+let typingTimer;
+function showTerm(name) {
+  document.querySelectorAll("#terms button").forEach(b => b.classList.toggle("on", b.dataset.term === name));
+  const term = document.getElementById("term");
+  term.innerHTML = TERMS[name].map(l => `<div class="line">${l || " "}</div>`).join("");
+  clearTimeout(typingTimer);
+  const lines = [...term.querySelectorAll(".line")];
+  let i = 0;
+  (function next() {
+    if (i >= lines.length) return;
+    lines[i++].classList.add("in");
+    term.scrollTop = term.scrollHeight;
+    typingTimer = setTimeout(next, name === "claude" ? 380 : 90);
+  })();
+}
+document.getElementById("terms").addEventListener("click", e => { const b = e.target.closest("button"); if (b) showTerm(b.dataset.term); });
+showTerm("claude");
+</script>
+<script src="shared.js"></script>
+</body>
+</html>

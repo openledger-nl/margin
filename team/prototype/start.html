@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get Started · Margin Team</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* steps */
+.steps { list-style: none; margin: 48px 0 0; padding: 0; display: flex; flex-direction: column; gap: 20px; }
+.step {
+  display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 32px; align-items: center;
+  padding: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow);
+}
+.step-num {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--green); color: #fff; font-size: 13px; font-weight: 600; margin-bottom: 14px;
+}
+.who-tag {
+  display: inline-block; margin-left: 8px; font-size: 11.5px; font-weight: 500; color: var(--ink-3);
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; vertical-align: 4px;
+}
+.step p { margin: 0 0 10px; }
+.step p:last-child { margin-bottom: 0; }
+.step .small { font-size: 13px; color: var(--ink-3); }
+
+/* VS Code look-alike mocks */
+.vs {
+  --vs-bg: #1F1F1F; --vs-side: #181818; --vs-line: #2B2B2B; --vs-ink: #CCCCCC; --vs-dim: #8B8B8B;
+  --vs-accent: #0078D4; --vs-sel: #04395E; --vs-input: #313131;
+  background: var(--vs-bg); color: var(--vs-ink); border: 1px solid var(--vs-line); border-radius: 10px;
+  font: 13px/1.45 var(--sans); overflow: hidden; box-shadow: var(--shadow-lg);
+}
+.vs .mono { font-family: var(--mono); }
+.page .vs p { color: var(--vs-ink); }
+.vs-btn {
+  display: inline-block; background: var(--vs-accent); color: #fff; border-radius: 3px; padding: 4px 12px;
+  font-size: 12.5px;
+}
+.vs-btn.ghost { background: #313131; color: var(--vs-ink); }
+
+.ext { display: flex; gap: 16px; padding: 18px; }
+.ext-icon { width: 64px; height: 64px; border-radius: 10px; flex-shrink: 0; }
+.ext h3 { margin: 0; font-size: 18px; font-weight: 600; color: #fff; }
+.ext .pub { color: var(--vs-dim); font-size: 12.5px; margin: 2px 0 8px; }
+.ext .desc { margin: 0 0 12px; font-size: 13px; }
+.ext .stores { margin-top: 10px; font-size: 11.5px; color: var(--vs-dim); }
+
+.palette-mock { padding: 8px; }
+.palette-mock .input {
+  background: var(--vs-input); border: 1px solid var(--vs-accent); border-radius: 4px; padding: 5px 9px;
+  font-size: 13px;
+}
+.palette-mock ul { list-style: none; margin: 6px 0 0; padding: 0; }
+.palette-mock li { padding: 5px 9px; border-radius: 4px; display: flex; gap: 8px; }
+.palette-mock li.sel { background: var(--vs-sel); }
+.palette-mock li .hint { margin-left: auto; color: var(--vs-dim); font-size: 12px; }
+.palette-mock mark { background: none; color: #2AAAFF; font-weight: 600; }
+.team-started { border-top: 1px solid var(--vs-line); padding: 16px 18px; display: grid; gap: 10px; }
+.team-started .label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--vs-dim); }
+.code-big { font-family: var(--mono); font-size: 26px; font-weight: 500; color: #4CC38A; letter-spacing: .04em; }
+.team-started .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.form-mock { padding: 16px 18px; display: grid; gap: 12px; }
+.form-mock .field { display: grid; gap: 4px; }
+.form-mock .field span { font-size: 12px; color: var(--vs-dim); }
+.form-mock .field div { background: var(--vs-input); border: 1px solid #3C3C3C; border-radius: 4px; padding: 6px 9px; }
+.form-mock .field div.focus { border-color: var(--vs-accent); }
+.ok { color: #4CC38A; }
+
+.toast { margin: 16px; background: #252526; border: 1px solid #3C3C3C; border-radius: 6px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+.toast .t-head { display: flex; gap: 10px; }
+.toast .t-icon { color: #2AAAFF; flex-shrink: 0; }
+.toast .t-src { font-size: 11.5px; color: var(--vs-dim); margin: 8px 0 10px 24px; }
+.toast .t-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+pre.json {
+  margin: 0 16px 16px; padding: 12px 14px; background: #181818; border: 1px solid var(--vs-line); border-radius: 6px;
+  font: 11.5px/1.6 var(--mono); color: #CCCCCC; overflow-x: auto;
+}
+pre.json .k { color: #9CDCFE; } pre.json .s { color: #CE9178; } pre.json .c { color: #6A9955; }
+
+.auth { padding: 22px; text-align: center; display: grid; gap: 12px; justify-items: center; }
+.auth .gh { width: 36px; height: 36px; }
+.auth .scopes { text-align: left; font-size: 12.5px; color: var(--vs-dim); display: grid; gap: 4px; }
+
+/* big screen */
+.tv { display: grid; justify-items: center; gap: 0; }
+.tv-screen {
+  width: 100%; aspect-ratio: 16 / 9; background: #0E1016; border: 10px solid #23262E; border-radius: 12px;
+  padding: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; box-shadow: var(--shadow-lg);
+}
+.tv-col { display: flex; flex-direction: column; gap: 6px; }
+.tv-col b { font-size: 9px; color: #737A8C; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.tv-card { background: #161922; border: 1px solid #262B37; border-radius: 4px; height: 30px; padding: 5px; display: flex; flex-direction: column; gap: 4px; }
+.tv-card i { display: block; height: 4px; border-radius: 2px; background: #3A3F4C; width: 80%; }
+.tv-card i + i { width: 45%; background: #2A2F3B; }
+.tv-card.live i + i { background: #4CC38A; }
+.tv-card.wait i + i { background: #E0A93B; }
+.tv-stand { width: 18%; height: 18px; background: #23262E; clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%); }
+.url { font-family: var(--mono); font-size: 12px; color: var(--ink-2); margin-top: 12px; }
+
+/* after setup */
+.section { margin-top: 64px; }
+.flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.flow-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; box-shadow: var(--shadow); }
+.flow-card .when { font-size: 13px; color: var(--ink-3); margin-bottom: 6px; }
+.flow-card .then { font-weight: 500; }
+.flow-card .move { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); }
+.flow-card .move .arrow { color: var(--green); }
+.col-pill { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); }
+.col-pill.to { background: var(--green-soft); color: var(--green); }
+
+/* architecture */
+.arch { margin-top: 18px; display: grid; grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr) 72px minmax(0, 1fr); align-items: stretch; }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); }
+.box h3 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.box .sub { font-size: 12px; color: var(--ink-3); margin-bottom: 12px; }
+.box ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.box li { font-size: 13px; color: var(--ink-2); position: relative; padding-left: 14px; }
+.box li::before { content: ""; position: absolute; left: 0; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.box li code { white-space: nowrap; }
+.link { display: grid; place-items: center; color: var(--ink-3); font-family: var(--mono); font-size: 11px; text-align: center; }
+.link svg { display: block; margin: 0 auto 4px; }
+.gh-box { margin-top: 14px; display: flex; gap: 12px; align-items: center; font-size: 13px; color: var(--ink-2); }
+.gh-box .box { padding: 10px 14px; display: flex; gap: 10px; align-items: center; }
+
+.after { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.after .box p { margin: 0; font-size: 13px; }
+.after code { font-size: 12px; }
+.note-box {
+  margin-top: 18px; padding: 14px 16px; border-radius: 10px; border: 1px dashed var(--line);
+  font-size: 13.5px; color: var(--ink-2);
+}
+
+@media (max-width: 1100px) { .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) {
+  .step { grid-template-columns: 1fr; gap: 22px; padding: 22px; }
+  .flow, .after { grid-template-columns: 1fr; }
+  .arch { grid-template-columns: 1fr; gap: 0; }
+  .link { padding: 8px 0; }
+  .link svg { transform: rotate(90deg); }
+}
+@media (max-width: 560px) { .step { padding: 18px; } }
+
+/* tailscale steps */
+.pm { padding: 16px 18px; display: grid; gap: 12px; }
+.pm-title { font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; }
+.pm-title .tag { font-weight: 400; font-size: 11.5px; color: var(--vs-dim); border: 1px solid #3C3C3C; border-radius: 999px; padding: 1px 8px; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 12.5px; }
+.checks li { display: flex; gap: 8px; align-items: baseline; }
+.checks .mono { font-size: 11.5px; color: #9CDCFE; }
+.invites { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.invites li { display: flex; align-items: center; gap: 8px; background: #252526; border: 1px solid #333; border-radius: 6px; padding: 7px 10px; font-size: 12.5px; }
+.invites li .end { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.invites .add { background: none; border-style: dashed; color: var(--vs-dim); }
+.vs .av { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 9.5px; font-weight: 600; color: #fff; }
+.inv-link { font-family: var(--mono); font-size: 11px; color: var(--vs-dim); overflow-wrap: anywhere; }
+.qr { width: 18px; height: 18px; background:
+  conic-gradient(#CCC 25%, transparent 0 50%, #CCC 0 75%, transparent 0) 0 0 / 6px 6px; border-radius: 2px; opacity: .8; }
+.split { display: grid; gap: 0; }
+.split .divider { font-size: 11px; color: var(--vs-dim); padding: 6px 18px; border-top: 1px solid var(--vs-line); border-bottom: 1px solid var(--vs-line); background: #1A1A1A; }
+.dialog { padding: 16px 18px; display: grid; gap: 10px; }
+.dialog h3 { margin: 0; font-size: 14px; color: #fff; font-weight: 600; }
+.dialog .meta { font-size: 12.5px; display: grid; gap: 4px; }
+.dialog .fine { font-size: 11.5px; color: var(--vs-dim); }
+
+/* connection diagram */
+.conn { margin-top: 18px; display: grid; grid-template-columns: minmax(0, 1fr) 72px minmax(0, 1fr) 72px minmax(0, 1fr); align-items: stretch; }
+.box.ts { border-style: dashed; background: transparent; box-shadow: none; }
+.reach { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.reach .box li::before { background: var(--green); }
+.reach .box.no li::before { background: var(--red); }
+@media (max-width: 900px) {
+  .conn, .reach { grid-template-columns: 1fr; }
+}
+
+/* network diagram */
+.net-wrap { margin-top: 18px; overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 12px; }
+.net { display: block; width: 100%; min-width: 760px; height: auto; }
+.net text { font: 12px var(--sans); fill: var(--ink-2); }
+.net .t { font-weight: 600; font-size: 13px; fill: var(--ink); }
+.net .m { font-family: var(--mono); font-size: 11px; fill: var(--ink); }
+.net .dim { fill: var(--ink-3); }
+.net .region { fill: none; stroke: var(--ink-3); stroke-width: 1.2; stroke-dasharray: 6 5; opacity: .7; }
+.net .rlabel { font-size: 11px; font-weight: 600; letter-spacing: .05em; fill: var(--ink-3); }
+.net .node { fill: var(--bg); stroke: var(--line); stroke-width: 1.2; }
+.net .node.host { stroke: var(--green); stroke-width: 1.6; }
+.net .ghost { fill: none; stroke: var(--ink-3); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.net .chip { fill: var(--surface-2); }
+.net .chip.on { fill: var(--green-soft); stroke: var(--green); stroke-width: 1; }
+.net .ok { stroke: var(--green); stroke-width: 2; fill: none; }
+.net .no { stroke: var(--red); stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+.net .okt { fill: var(--green); font-weight: 600; }
+.net .not { fill: var(--red); font-weight: 600; }
+.net .okfill { fill: var(--green); } .net .nofill { fill: var(--red); }
+.net .band { fill: var(--surface-2); }
+.caption { font-size: 13px; color: var(--ink-3); margin: 10px 4px 0; }
+.qa { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.qa .box p { margin: 0 0 8px; font-size: 13px; }
+.qa .box p:last-child { margin-bottom: 0; }
+.qa .verdict { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.qa .verdict.ok { color: var(--green); } .qa .verdict.warn { color: var(--amber); }
+@media (max-width: 900px) { .qa { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="index.html">
+    <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#F4F1EA"/><path d="M64 448L64 64L176 64L256 212L336 64L448 64L448 448L336 448L336 236L256 372L176 236L176 448Z" fill="#2F9E6B"/><rect x="82" y="82" width="76" height="236" fill="#0E1016"/><path d="M96 104L124 124L96 144L96 133L109 124L96 115Z" fill="#4CC38A"/><rect x="130" y="135" width="20" height="9" fill="#4CC38A"/><rect x="98" y="164" width="48" height="9" fill="#B4BACB"/><rect x="98" y="186" width="32" height="9" fill="#B4BACB"/></svg>
+    <span>Margin Team</span>
+  </a>
+  <nav class="pages" aria-label="Pages"><a href="index.html">Board</a><a href="start.html" aria-current="page">Get started</a><a href="vscode.html">In VS Code</a></nav>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch light and dark">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.2"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
+  </button>
+</header>
+
+<main class="page">
+  <p class="eyebrow">Get started · planned, not built yet</p>
+  <h1>A team board in two minutes</h1>
+  <p class="lede">Everyone needs Tailscale. The host runs the board in a small Docker container and shares only that container with the team, never their laptop. It works in the same room and across the internet, nobody opens a port, and a wrong setting can't expose anyone's laptop.</p>
+
+  <ol class="steps">
+
+    <li class="step">
+      <div>
+        <span class="step-num">1</span><span class="who-tag">everyone</span>
+        <h2>Install Tailscale and Margin Team</h2>
+        <p><b style="font-weight:500">Tailscale</b> with your own free account, and <b style="font-weight:500">Margin Team</b> from the VS Code Marketplace (or Open VSX in Cursor and Windsurf).</p>
+        <p>Already use Tailscale, personally or for work? Keep it as it is. You don't join anyone else's tailnet.</p>
+        <p>The host also needs <b style="font-weight:500">Docker</b>. Teammates don't.</p>
+        <p class="small">One extension does everything: it reads git and your terminals, talks to Claude Code and GitHub, and shows the board.</p>
+      </div>
+      <div class="vs">
+        <div class="ext">
+          <svg class="ext-icon" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" fill="#F4F1EA"/><path d="M64 448L64 64L176 64L256 212L336 64L448 64L448 448L336 448L336 236L256 372L176 236L176 448Z" fill="#2F9E6B"/><rect x="82" y="82" width="76" height="236" fill="#0E1016"/><path d="M96 104L124 124L96 144L96 133L109 124L96 115Z" fill="#4CC38A"/><rect x="130" y="135" width="20" height="9" fill="#4CC38A"/><rect x="98" y="164" width="48" height="9" fill="#B4BACB"/><rect x="98" y="186" width="32" height="9" fill="#B4BACB"/></svg>
+          <div>
+            <h3>Margin Team</h3>
+            <div class="pub">Margin</div>
+            <p class="desc">A live board of your team's branches, Claude sessions and pull requests.</p>
+            <span class="vs-btn">Install</span>
+            <div class="stores">VS Code Marketplace · Open VSX</div>
+            <div class="stores" style="color:#4CC38A">✓ Tailscale found · signed in · tailnet zeb.github</div>
+          </div>
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div>
+        <span class="step-num">2</span><span class="who-tag">host</span>
+        <h2>Start a team</h2>
+        <p>Open the repo and run <code>Margin Team: Start a team</code>. Margin starts the board in a small Docker container, <code>margin-team</code>, with Tailscale inside it.</p>
+        <p>You reach it at <code>http://localhost:4780</code>. Docker publishes that port on <code>127.0.0.1</code> only, so it never appears on the venue Wi-Fi.</p>
+        <p class="small">The extension that started the container keeps a host key, so the board knows which requests are yours. Teammates are recognized by Tailscale.</p>
+      </div>
+      <div class="vs">
+        <div class="pm">
+          <div class="pm-title">Margin Team: Start a team <span class="tag">Harbour Hack</span></div>
+          <ul class="checks">
+            <li><span class="ok">✓</span><span>Docker is running</span></li>
+            <li><span class="ok">✓</span><span>Container <span class="mono">margin-team</span> started</span></li>
+            <li><span class="ok">✓</span><span>Your board: <span class="mono">http://localhost:4780</span> (only this laptop)</span></li>
+            <li><span style="color:#E0A93B">!</span><span>Add the container to Tailscale so teammates can reach it. <span style="color:#3794FF">Connect →</span></span></li>
+          </ul>
+        </div>
+        <pre class="json"><span class="c"># what Margin runs</span>
+<span class="c"># -p: only on localhost, never 0.0.0.0</span>
+<span class="c"># -v: Tailscale identity + board data</span>
+docker run -d --name margin-team \
+  -p 127.0.0.1:4780:4780 \
+  -v margin-team:/var/lib/margin \
+  ghcr.io/margin/team
+
+<span class="c"># inside: Tailscale in userspace mode, no proxy, so</span>
+<span class="c"># nothing in the container can reach your tailnet.</span>
+<span class="c"># tailscale serve: https :4780 → the board</span></pre>
+      </div>
+    </li>
+
+    <li class="step">
+      <div>
+        <span class="step-num">3</span><span class="who-tag">host, first time</span>
+        <h2>Add the container to Tailscale</h2>
+        <p>The first time, the container shows a Tailscale login link. Margin opens it, you click <b style="font-weight:500">Connect</b>, and the container is a machine in your tailnet: <code>margin-andor</code>.</p>
+        <p>The container keeps that identity in its Docker volume, so next time it reconnects by itself.</p>
+        <p class="small">No policy changes. Even with Tailscale's default "everyone can reach everything", the only thing in this container is the board.</p>
+      </div>
+      <div class="vs">
+        <div class="auth">
+          <div style="font-size:15px;color:#fff;font-weight:600">Connect device</div>
+          <div>Add <span class="mono" style="color:#9CDCFE">margin-andor</span> to tailnet <span class="mono" style="color:#9CDCFE">andor.github</span>?</div>
+          <div class="scopes"><span>Linux · Docker container · Tailscale 1.9x</span><span>Owned by you, like your other machines</span></div>
+          <div style="display:flex;gap:6px"><span class="vs-btn ghost">Cancel</span><span class="vs-btn">Connect</span></div>
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div>
+        <span class="step-num">4</span><span class="who-tag">host</span>
+        <h2>Share the container with the team</h2>
+        <p>Share <code>margin-andor</code> with your teammates in Tailscale: <code>Margin Team: Share with team</code> opens the right page. Share the container, <b style="font-weight:500">not your laptop</b>.</p>
+        <p class="small">Margin warns you if it sees your laptop itself is shared. Shared machines can't start connections to the people you share with, so the container can't reach their laptops either.</p>
+      </div>
+      <div class="vs">
+        <div class="dialog">
+          <h3>Share margin-andor</h3>
+          <div class="meta"><span>Anyone with the invite can add this machine to their own tailnet.</span></div>
+          <ul class="invites">
+            <li><span class="av" style="background:#3D6FD6">Z</span>zeb@example.com<span class="end"><span class="ok" style="font-size:12px">accepted ✓</span></span></li>
+            <li><span class="av" style="background:#B97A12">S</span>sam@example.com<span class="end"><span style="color:var(--vs-dim);font-size:12px">invited</span></span></li>
+            <li class="add">+ Invite by email or copy an invite link</li>
+          </ul>
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div>
+        <span class="step-num">5</span><span class="who-tag">everyone else</span>
+        <h2>Accept, then join</h2>
+        <p>Accept the share in Tailscale: <code>margin-andor</code> shows up in your own tailnet. Then run <code>Margin Team: Join team</code>. Margin finds the team on it by itself.</p>
+        <p>Tailscale tells the board who you are, so no codes or passwords. The host allows you once.</p>
+      </div>
+      <div class="vs split">
+        <div class="dialog">
+          <h3>Join Harbour Hack?</h3>
+          <div class="meta">
+            <span>Found on <span class="mono">margin-andor</span> (shared by Andor) <span class="ok">✓ same repo open</span></span>
+            <span>Your name: Zeb</span>
+          </div>
+          <div><span class="vs-btn">Join</span> <span class="vs-btn ghost">Cancel</span></div>
+        </div>
+        <div class="divider">meanwhile, on the host's laptop</div>
+        <div class="toast">
+          <div class="t-head"><span class="t-icon">ⓘ</span><span>zeb@example.com wants to join Harbour Hack.</span></div>
+          <div class="t-src">Source: Margin Team · identity from Tailscale</div>
+          <div class="t-actions"><span class="vs-btn ghost">Deny</span><span class="vs-btn">Allow</span></div>
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div>
+        <span class="step-num">6</span><span class="who-tag">everyone</span>
+        <h2>Connect Claude Code</h2>
+        <p>The extension offers to add a few Claude Code hooks and the Margin Team MCP server. One click.</p>
+        <p>The hooks tell the board what your sessions are doing. The MCP server lets your Claude read the board, so it knows what the others are working on.</p>
+        <p class="small">Only the task line, the agent's state and file paths go out. Never your prompts, Claude's answers or terminal output.</p>
+      </div>
+      <div class="vs">
+        <div class="toast">
+          <div class="t-head"><span class="t-icon">ⓘ</span><span>Show your Claude Code sessions on the team board, and let Claude read the board?</span></div>
+          <div class="t-src">Source: Margin Team</div>
+          <div class="t-actions"><span class="vs-btn ghost">Not now</span><span class="vs-btn ghost">Only this repo</span><span class="vs-btn">Connect</span></div>
+        </div>
+        <pre class="json"><span class="c">// what "Connect" adds to ~/.claude/settings.json</span>
+{
+  <span class="k">"hooks"</span>: {
+    <span class="k">"SessionStart"</span>:     [{ <span class="k">"hooks"</span>: [{ <span class="k">"type"</span>: <span class="s">"command"</span>, <span class="k">"command"</span>: <span class="s">"margin-team hook start"</span> }] }],
+    <span class="k">"UserPromptSubmit"</span>: [{ <span class="k">"hooks"</span>: [{ <span class="k">"type"</span>: <span class="s">"command"</span>, <span class="k">"command"</span>: <span class="s">"margin-team hook prompt"</span> }] }],
+    <span class="k">"PreToolUse"</span>:       [{ <span class="k">"matcher"</span>: <span class="s">"Bash"</span>, <span class="k">"hooks"</span>: [ <span class="c">… "hook before-push": local CI first …</span> ] }],
+    <span class="k">"PostToolUse"</span>:      [{ <span class="k">"matcher"</span>: <span class="s">"Edit|Write|Bash"</span>, <span class="k">"hooks"</span>: [ <span class="c">… "hook tool" …</span> ] }],
+    <span class="k">"Notification"</span>:     [ <span class="c">… "hook waiting" …</span> ],
+    <span class="k">"Stop"</span>:             [ <span class="c">… "hook idle" …</span> ]
+  }
+}
+<span class="c">// and the MCP server</span>
+claude mcp add margin-team -- npx -y margin-team-mcp</pre>
+      </div>
+    </li>
+
+    <li class="step">
+      <div>
+        <span class="step-num">7</span><span class="who-tag">host</span>
+        <h2>Local CI first</h2>
+        <p>The extension reads your GitHub workflow and finds the checks it runs. You confirm them once, and they're saved in <code>margin-team.json</code> in the repo, so the whole team uses the same ones.</p>
+        <p>From then on every push runs those checks on your own laptop first. When Claude runs <code>git push</code> and a check fails, the push waits and Claude gets the failure to fix. Your own pushes get the same check through a git pre-push hook.</p>
+        <p class="small">GitHub CI becomes the confirmation, not the place you find out. At a hackathon, where the Actions queue is slow and every red PR costs minutes, that matters.</p>
+      </div>
+      <div class="vs">
+        <div class="toast">
+          <div class="t-head"><span class="t-icon">ⓘ</span><span>Found 3 checks in <span class="mono">.github/workflows/ci.yml</span>. Run them before every push?</span></div>
+          <div class="t-src">Source: Margin Team</div>
+          <div class="t-actions"><span class="vs-btn ghost">Edit checks</span><span class="vs-btn">Use these</span></div>
+        </div>
+        <pre class="json"><span class="c">// margin-team.json, committed so the team shares it</span>
+{
+  <span class="k">"localCI"</span>: {
+    <span class="k">"checks"</span>: [<span class="s">"pnpm typecheck"</span>, <span class="s">"pnpm test"</span>, <span class="s">"pnpm build"</span>],
+    <span class="k">"beforePush"</span>: <span class="s">"hold"</span>   <span class="c">// "hold" the push, or only "warn"</span>
+  }
+}
+
+<span class="c">// what Claude sees when a check fails</span>
+<span class="s">Push held by Margin Team: local CI failed on "pnpm test"</span>
+<span class="s">  TeamPage.test.tsx › shows the score: expected "120 points"</span>
+<span class="s">Fix it and push again.</span></pre>
+      </div>
+    </li>
+
+    <li class="step">
+      <div>
+        <span class="step-num">8</span><span class="who-tag">everyone</span>
+        <h2>Allow GitHub</h2>
+        <p>Margin Team uses the GitHub account VS Code is already signed in with, to read the pull requests, checks and reviews of this repo.</p>
+        <p class="small">Each person reads with their own login, so the host never holds anyone's token.</p>
+      </div>
+      <div class="vs">
+        <div class="auth">
+          <svg class="gh" viewBox="0 0 16 16" fill="#CCCCCC" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+          <div>The extension 'Margin Team' wants to sign in using GitHub.</div>
+          <div class="scopes"><span>✓ read pull requests and reviews</span><span>✓ read checks (CI)</span></div>
+          <div style="display:flex;gap:6px"><span class="vs-btn ghost">Cancel</span><span class="vs-btn">Allow</span></div>
+        </div>
+      </div>
+    </li>
+
+    <li class="step">
+      <div>
+        <span class="step-num">9</span><span class="who-tag">optional</span>
+        <h2>Put the board on the big screen</h2>
+        <p>On the host's laptop: <code>http://localhost:4780</code>. On a teammate's: <code>https://margin-andor.tail1234.ts.net:4780</code>. Plug either into the TV; it updates live.</p>
+        <p class="small">The board is only inside Tailscale, never on the venue network or the internet. Inside VS Code: <code>Margin Team: Open board</code>.</p>
+      </div>
+      <div class="tv" aria-hidden="true">
+        <div class="tv-screen">
+          <div class="tv-col"><b>Up next</b><div class="tv-card"><i></i><i></i></div><div class="tv-card"><i></i><i></i></div></div>
+          <div class="tv-col"><b>Building</b><div class="tv-card live"><i></i><i></i></div><div class="tv-card wait"><i></i><i></i></div><div class="tv-card live"><i></i><i></i></div></div>
+          <div class="tv-col"><b>In review</b><div class="tv-card"><i></i><i></i></div><div class="tv-card live"><i></i><i></i></div></div>
+          <div class="tv-col"><b>Shipped</b><div class="tv-card"><i></i><i></i></div><div class="tv-card"><i></i><i></i></div></div>
+        </div>
+        <div class="tv-stand"></div>
+        <div class="url">localhost:4780 · margin-andor.tail1234.ts.net:4780</div>
+      </div>
+    </li>
+
+  </ol>
+
+  <section class="section">
+    <h2>From then on, just work</h2>
+    <p>Nobody moves cards. The board follows your branches.</p>
+    <div class="flow">
+      <div class="flow-card">
+        <div class="when">You start Claude on a new branch</div>
+        <div class="then">A card appears, titled from your first prompt</div>
+        <div class="move"><span class="col-pill to">Building</span></div>
+      </div>
+      <div class="flow-card">
+        <div class="when">Claude wants to push</div>
+        <div class="then">Local CI runs first. Red means the push waits and Claude fixes it</div>
+        <div class="move"><span class="col-pill" style="color:var(--red);background:var(--red-soft)">local ✗</span><span class="arrow">→</span><span class="col-pill to">local ✓ pushed</span></div>
+      </div>
+      <div class="flow-card">
+        <div class="when">You or your Claude open a pull request</div>
+        <div class="then">The card picks up the PR and its CI</div>
+        <div class="move"><span class="col-pill">Building</span><span class="arrow">→</span><span class="col-pill to">In review</span></div>
+      </div>
+      <div class="flow-card">
+        <div class="when">The pull request is merged</div>
+        <div class="then">The card is done, its agents leave it</div>
+        <div class="move"><span class="col-pill">In review</span><span class="arrow">→</span><span class="col-pill to">Shipped</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>The network</h2>
+    <p>Everyone stays in their own tailnet. The only thing shared is the board's container. Andor reaches it on localhost, the teammates through Tailscale.</p>
+    <div class="net-wrap">
+      <svg class="net" viewBox="0 0 1000 580" role="img" aria-label="Network diagram: the board runs in a Docker container on Andor's laptop. Andor reaches it on localhost. Only the container is shared, into Zeb's and Sam's own tailnets, on port 4780. The laptop, the NAS and the phone are not shared, and the container cannot connect back.">
+        <defs>
+          <marker id="arOk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="okfill" d="M0 0L10 5L0 10z"/></marker>
+          <marker id="arNo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="nofill" d="M0 0L10 5L0 10z"/></marker>
+        </defs>
+
+        <!-- host tailnet -->
+        <rect class="region" x="20" y="20" width="420" height="420" rx="16"/>
+        <text class="rlabel" x="40" y="44">ANDOR'S TAILNET · HOST</text>
+        <rect class="node" x="40" y="60" width="380" height="240" rx="10"/>
+        <text class="t" x="60" y="88">Andor's laptop</text>
+        <text class="dim" x="60" y="108">not shared · dev server, Docker ports, SSH unreachable</text>
+        <rect class="chip" x="60" y="122" width="150" height="54" rx="6"/>
+        <text x="74" y="144">VS Code, browser</text>
+        <text class="m" x="74" y="163">localhost:4780</text>
+        <!-- container -->
+        <rect class="node host" x="232" y="122" width="170" height="160" rx="8"/>
+        <text class="t" x="246" y="146">Docker: margin-team</text>
+        <text class="dim" x="246" y="164">machine margin-andor</text>
+        <rect class="chip" x="246" y="176" width="142" height="40" rx="5"/>
+        <text x="256" y="192">board :4780</text>
+        <text class="m" x="256" y="208">team server</text>
+        <rect class="chip on" x="246" y="224" width="142" height="44" rx="5"/>
+        <text x="256" y="241">tailscale serve</text>
+        <text class="m" x="256" y="258">https :4780</text>
+        <!-- host to container over localhost -->
+        <path class="ok" d="M210 150 L 244 196" marker-end="url(#arOk)"/>
+        <text class="okt" x="70" y="200">127.0.0.1 only ✓</text>
+        <text class="dim" x="70" y="218">never the venue Wi-Fi</text>
+
+        <rect class="node" x="40" y="320" width="180" height="100" rx="10"/>
+        <text class="t" x="60" y="350">Home NAS</text>
+        <text class="dim" x="60" y="372">not shared</text>
+        <rect class="node" x="240" y="320" width="180" height="100" rx="10"/>
+        <text class="t" x="260" y="350">Andor's phone</text>
+        <text class="dim" x="260" y="372">not shared</text>
+
+        <!-- Zeb -->
+        <rect class="region" x="560" y="20" width="420" height="200" rx="16"/>
+        <text class="rlabel" x="580" y="44">ZEB'S TAILNET · PERSONAL</text>
+        <rect class="node" x="580" y="60" width="200" height="140" rx="10"/>
+        <text class="t" x="598" y="88">Zeb's laptop</text>
+        <text class="dim" x="598" y="110">VS Code + Margin Team</text>
+        <text class="dim" x="598" y="130">Claude Code</text>
+        <rect class="ghost" x="800" y="60" width="160" height="140" rx="10"/>
+        <text class="t" x="818" y="88">margin-andor</text>
+        <text class="dim" x="818" y="110">shared in</text>
+        <text class="m" x="818" y="130">the board only</text>
+
+        <!-- Sam -->
+        <rect class="region" x="560" y="240" width="420" height="200" rx="16"/>
+        <text class="rlabel" x="580" y="264">SAM'S TAILNET · COMPANY</text>
+        <rect class="node" x="580" y="280" width="200" height="120" rx="10"/>
+        <text class="t" x="598" y="308">Sam's laptop</text>
+        <text class="dim" x="598" y="330">VS Code + Margin Team</text>
+        <text class="dim" x="598" y="350">Claude Code</text>
+        <rect class="ghost" x="800" y="280" width="160" height="120" rx="10"/>
+        <text class="t" x="818" y="308">margin-andor</text>
+        <text class="dim" x="818" y="330">shared in</text>
+        <text class="m" x="818" y="350">the board only</text>
+        <text class="dim" x="580" y="424">company servers stay private to Sam's company</text>
+
+        <!-- allowed: teammates to the container -->
+        <path class="ok" d="M578 150 C 500 150, 470 240, 392 244" marker-end="url(#arOk)"/>
+        <text class="okt" x="474" y="148">HTTPS :4780 ✓</text>
+        <path class="ok" d="M578 340 C 490 340, 470 252, 392 252" marker-end="url(#arOk)"/>
+        <text class="okt" x="462" y="364">HTTPS :4780 ✓</text>
+        <!-- blocked -->
+        <path class="no" d="M422 76 L 576 76" marker-end="url(#arNo)"/>
+        <text class="not" x="500" text-anchor="middle"><tspan x="500" y="50">✗ can't connect</tspan><tspan x="500" y="65">back to teammates</tspan></text>
+
+        <!-- tailscale infrastructure -->
+        <rect class="band" x="20" y="470" width="470" height="86" rx="10"/>
+        <text class="t" x="40" y="500">Tailscale coordination server</text>
+        <text x="40" y="522">hands out keys and addresses</text>
+        <text class="dim" x="40" y="542">never sees the traffic or the board</text>
+        <rect class="band" x="510" y="470" width="470" height="86" rx="10"/>
+        <text class="t" x="530" y="500">Tailscale relay (DERP), port 443</text>
+        <text x="530" y="522">only when a direct connection fails</text>
+        <text class="dim" x="530" y="542">passes encrypted packets, gets through venue Wi-Fi</text>
+      </svg>
+    </div>
+    <p class="caption">Traffic between laptops is WireGuard, encrypted end to end, direct when possible. GitHub isn't in this picture: each laptop reads PRs and CI with its own login.</p>
+
+    <div class="reach">
+      <div class="box"><h3>Teammates can reach</h3><ul><li>The board in the container, over HTTPS on port 4780</li><li>Nothing else: the container is all they're shared</li></ul></div>
+      <div class="box no"><h3>Nobody can reach</h3><ul><li>Andor's laptop: its dev server, Docker ports and SSH</li><li>Andor's other devices: they're not shared</li><li>Andor's tailnet from inside the container: no proxy, so no way out</li><li>Teammates' laptops: a shared machine can't start connections</li><li>Anything from the internet or the venue Wi-Fi</li></ul></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Does this change my existing Tailscale?</h2>
+    <div class="qa">
+      <div class="box">
+        <div class="verdict ok">Teammates: no</div>
+        <h3>Your tailnet stays yours</h3>
+        <p>You don't join the host's tailnet. Accepting the share adds one machine, Andor's laptop, to your own tailnet. Your devices stay invisible to Andor, and you keep your work or personal tailnet connected the whole time.</p>
+      </div>
+      <div class="box">
+        <div class="verdict ok">Host: one extra machine</div>
+        <h3>No policy changes</h3>
+        <p>The container shows up as one more machine in your tailnet, <code>margin-andor</code>. Nothing on your laptop and nothing in your policy changes.</p>
+        <p>Get a setting wrong, or forget one, and the worst case is that the board doesn't work. Your laptop is never part of the share.</p>
+      </div>
+      <div class="box">
+        <div class="verdict warn">Company tailnets: ask first</div>
+        <h3>Admins decide</h3>
+        <p>On a company tailnet, admins may not allow accepting shares, and as host you may not be allowed to edit the policy. Then host from a personal account, or join with a personal laptop.</p>
+      </div>
+    </div>
+    <div class="note-box"><b style="font-weight:500">Two rules that don't depend on the network.</b> Board text is untrusted input for everyone's Claude: it arrives as marked data with short fields. And nothing from the network is ever run: local CI checks come only from <code>margin-team.json</code> in git.</div>
+  </section>
+
+  <section class="section">
+    <h2>After the hackathon</h2>
+    <div class="after">
+      <div class="box"><h3>End the team</h3><p>The host runs <code>Margin Team: End team</code>. The container stops, every laptop deletes the board, and Margin reminds the host to stop sharing <code>margin-andor</code>. <code>Forget Margin machine</code> also removes it from the tailnet.</p></div>
+      <div class="box"><h3>Leave a team</h3><p>Anyone can run <code>Margin Team: Leave team</code>, and the host can remove someone. Your cards stay and your agents stop reporting. Remove <code>margin-andor</code> from your tailnet whenever you like.</p></div>
+      <div class="box"><h3>Remove the hooks</h3><p>The hooks do nothing outside a team. <code>Margin Team: Disconnect Claude Code</code> takes them out again.</p></div>
+    </div>
+    <div class="note-box"><b style="font-weight:500">Not using VS Code?</b> With Tailscale running, <code>npx margin-team join margin-andor</code> adds the Claude Code hooks and the MCP server. Your sessions and branches still show up; you just see the board in the browser, and there's no terminal info.</div>
+  </section>
+</main>
+
+<script src="shared.js"></script>
+</body>
+</html>
